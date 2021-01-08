@@ -4,15 +4,15 @@
 
 using System;
 using System.Threading.Tasks;
-using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class NetworkBehaviour : MonoBehaviour
 {
     // Public fields
     public float ProbabilityThreshold = 0.5f;
     public Vector2 InputFeatureSize = new Vector2(224, 224);
-    public TextMeshProUGUI StatusBlock;
+    public Text StatusBlock;
 
     // Private fields
     private NetworkModel _networkModel;
@@ -102,7 +102,7 @@ public class NetworkBehaviour : MonoBehaviour
             {
                 StatusBlock.text = $"Label: {result.PredictionLabel} " +
                 $"Probability: {Math.Round(result.PredictionProbability, 3) * 100}% " +
-                $"Inference time: {result.PredictionTime}";
+                $"Inference time: {result.PredictionTime} ms";
             }, false);
         }
         catch (Exception ex)

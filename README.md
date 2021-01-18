@@ -11,7 +11,7 @@ Using the `EfficientNetB0` model, trained on the `ImageNet` 1000 class dataset, 
 - Open sample in Unity
 - Switch build platform to `Universal Windows Platform`, select `HoloLens` for target device, and `ARM64` as the target platform
 - Build Visual Studio project and open .sln file
-- Copy the `model.onnx` file to the `Builds\HoloLens-2-Machine-Learning\Assets` folder
+- Copy the `onnx-models\model.onnx` file to the `Builds\HoloLens-2-Machine-Learning\Assets` folder
 - Import to Visual Studio project as an existing file, place in the assets folder
 - In the asset properties window (as below), confirm that the `Content` field has its boolean value set to `True`. This enables the `ONNX` model to be loaded at runtime from the Visual Studio assets folder
 
@@ -22,3 +22,6 @@ Using the `EfficientNetB0` model, trained on the `ImageNet` 1000 class dataset, 
 - Output includes the `predicted label`, its associated `probability` and the `inference time` in milliseconds 
 
 ![](french-bulldog-detection.jpg)
+
+## Model conversion to ONNX
+- See sample conversion from official TensorFlow efficientnet weights to ONNX format in [README file](onnx-models/README.md)

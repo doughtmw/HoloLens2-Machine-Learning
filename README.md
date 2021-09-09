@@ -2,6 +2,7 @@
 Using the `EfficientNetB0` model, trained on the `ImageNet` 1000 class dataset, for image classification. Model inference is run directly on the HoloLens 2 using its onboard CPU. 
 
 ## About
+- Optimal performance is achieved using version 19041 builds. In this sample I am using build 19041.1161 (Windows Holographic, version 20H2 - August 2021 Update) which can be downloaded from MSFT via the following [link](https://aka.ms/hololens2download/10.0.19041.1161) and installed using the [Advanced Recovery Companion](https://www.microsoft.com/en-ca/p/advanced-recovery-companion/9p74z35sfrs8?rtc=1&activetab=pivot:overviewtab)
 - Tested with Unity 2019.4 LTS, Visual Studio 2019, and the HoloLens 2
 - Building off of the [WinMLExperiments](https://github.com/reneschulte/WinMLExperiments) sample from Rene Schulte
 - Input video frames of size `(224, 224)` for online inference

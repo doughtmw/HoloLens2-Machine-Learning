@@ -8,4 +8,12 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/inference.unity
     guid: 9fc0d4010bbf28b4594072e72b8655ab
-  m_configObjects: {}
+  m_configObjects:
+    Unity.XR.Oculus.Settings: {fileID: 11400000, guid: f18ee0ab804fa12439875c3ec15440a1,
+      type: 2}
+    Unity.XR.WindowsMR.Settings: {fileID: 11400000, guid: 6845252eb54029947a211dcdf695c806,
+      type: 2}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: f516feda9d2db364d873782ee94a3f40,
+      type: 2}
+    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: 9c68b31fe8bd5cb489bf4937cb28d009,
+      type: 2}

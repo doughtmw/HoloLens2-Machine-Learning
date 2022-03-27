@@ -17,6 +17,7 @@ using Windows.Storage;
 using System.Diagnostics;
 #endif 
 
+
 public struct NetworkResult
 {
     public NetworkResult(string pred, float prob, long time)

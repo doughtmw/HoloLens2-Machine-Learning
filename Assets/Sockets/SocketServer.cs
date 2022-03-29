@@ -29,6 +29,7 @@ using System.Threading.Tasks;
 
 
 [RequireComponent(typeof(ARAnchorManager))]
+[RequireComponent(typeof(ARAnchor))]
 public class SocketServer : MonoBehaviour
 {
     public String _input = "Waiting";
@@ -38,14 +39,19 @@ public class SocketServer : MonoBehaviour
     XRAnchorTransferBatch myAnchorTransferBatch = new XRAnchorTransferBatch();
     bool localAnchorAdded = false;
     bool localBatchReady = false;
-    bool batchSentToClients = false;
+    bool localAnchorStreamCreated = false;
 
+    Stream tempStream;
+    MemoryStream memoryStream = new MemoryStream();
+    Int64 bytesSent;
 
 #if !UNITY_EDITOR
-    StreamSocketListener listener;
+    StreamSocketListener listener = new StreamSocketListener();
     String port;
     String message;
     Byte[] data;
+ 
+    StreamSocket clientSocket = new StreamSocket();
 #else
     TcpListener server=null;
     bool _Active;
@@ -54,13 +60,13 @@ public class SocketServer : MonoBehaviour
 #endif
 
     // Use this for initialization
-    void Start()
+    async void Start()
     {
 
-        
+
 
 #if !UNITY_EDITOR
-            listener = new StreamSocketListener();
+        
         port = "9999";
         listener.ConnectionReceived += Listener_ConnectionReceived;
         listener.Control.KeepAlive = false;
@@ -93,13 +99,13 @@ public class SocketServer : MonoBehaviour
             XRSubsystem.Start();
         }
 
-        myTrackableId = this.GetComponent<ARAnchor>().trackableId;
-        localAnchorAdded = tryAddLocalAnchor();
+       tryAddLocalAnchor();
+
     }
 
 
 #if !UNITY_EDITOR
-    private async void Listener_Start()
+        private async void Listener_Start()
     {
         Debug.Log("Listener started");
         try
@@ -118,25 +124,19 @@ public class SocketServer : MonoBehaviour
 
     private async void Listener_ConnectionReceived(StreamSocketListener sender, StreamSocketListenerConnectionReceivedEventArgs args)
     {
-
-        //None of the Debug Messages here will show on the main thread.
-        _input = "Connection received";
-        //Debug.Log("Connection received");
-        Stream streamOut = args.Socket.OutputStream.AsStreamForWrite();
-        writer = new StreamWriter(streamOut) { AutoFlush = true };
-
-        //Stream streamIn = args.Socket.InputStream.AsStreamForRead();
-        //reader = new StreamReader(streamIn);
-
-        writer.Write("X\n");
-        //Debug.Log("Sent data!");
-        //string received = null;
-
-
-        //received = reader.ReadLine();
-        //_input= received;
-
+            clientSocket = args.Socket;
+            //None of the Debug Messages here will show on the main thread.
+            if (localAnchorStreamCreated)
+            {
+            trySendSpatialAnchorToClient(clientSocket);
+            }
+            else
+            {
+                Debug.Log("Connection Received, but no anchor batch ready to send");
+                writer.Write("-1");
+            }
     }
+
 
 #else
 
@@ -192,7 +192,16 @@ public class SocketServer : MonoBehaviour
     void Update()
     {
 #if !UNITY_EDITOR
-        //Debug.Log(_input);
+
+
+        if (localBatchReady)
+        {
+            Debug.Log("Exported Anchor Batch in Socket Stream");
+            Debug.Log("The size of the written stream is: " + tempStream.Length);
+            localBatchReady = false;
+        }
+
+
 #else
     listenForClientConnection();
 
@@ -248,11 +257,48 @@ public class SocketServer : MonoBehaviour
         StopExchange();
     }
 
-    bool tryAddLocalAnchor()
+    async void tryAddLocalAnchor()
     {
-        myTrackableId = this.GetComponent<ARAnchor>().trackableId;
-        return myAnchorTransferBatch.AddAnchor(myTrackableId, "HostPosition");
+
+        Debug.Log("Creating Export Anchor Batch in Socket Stream");
+
+        while (tempStream == null)
+        {
+            myTrackableId = this.GetComponent<ARAnchor>().trackableId;
+            myAnchorTransferBatch.AddAnchor(myTrackableId, "HostPosition");
+            tempStream = await XRAnchorTransferBatch.ExportAsync(myAnchorTransferBatch);
+        }
+
+        await tempStream.CopyToAsync(memoryStream);
+        if (tempStream != null)
+        {
+            localAnchorStreamCreated = true;
+
+        }
+            Debug.Log("Anchor Copied To Local Stream");
+
+
     }
+    #if !UNITY_EDITOR
+    async void trySendSpatialAnchorToClient(StreamSocket socket)
+    {
+
+        Stream streamOut = socket.OutputStream.AsStreamForWrite();
+        writer = new StreamWriter(streamOut) { AutoFlush = true };
+        int bytesWritten = 0;
+        await writer.WriteAsync(tempStream.Length.ToString());
+        /*while (bytesWritten < tempStream.Length)
+        {
+            await writer.WriteAsync(Encoding.Unicode.GetChars(memoryStream.ToArray()), bytesWritten, 256);
+            bytesWritten += 256;
+        }*/
+        var inputBuffer = memoryStream.GetBuffer();
+        await writer.WriteAsync(Convert.ToBase64String(memoryStream.ToArray()));
+
+
+        localBatchReady = true;
+    }
+#endif
 
     XRAnchorSubsystem CreateXRSubsystem()
     {
@@ -274,4 +320,5 @@ public class SocketServer : MonoBehaviour
 
         return null;
     }
+
 }

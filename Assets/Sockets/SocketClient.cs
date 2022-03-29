@@ -33,12 +33,15 @@ public class SocketClient : MonoBehaviour
     Byte[] data = System.Text.Encoding.ASCII.GetBytes("Hello from the Client");
     private StreamWriter writer;
     private StreamReader reader;
+    XRAnchorTransferBatch myAnchorTransferBatch = new XRAnchorTransferBatch();
+    long streamLength;
 
 #if !UNITY_EDITOR
     StreamSocket socket = new Windows.Networking.Sockets.StreamSocket();
     HostName serverHost = new HostName("192.168.0.162");
     String port = "9999";
     bool _Connected = false;
+    bool anchorReceived = false;
 
 #else
     Int32 port = 9999;
@@ -89,47 +92,78 @@ public class SocketClient : MonoBehaviour
                 Client_Start();
             }
         }
-        // Send a request to the echo server.
-        //string request = "Hello, World!";
-        //using (Stream outputStream = socket.OutputStream.AsStreamForWrite())
-        //{
-        //    using (var streamWriter = new StreamWriter(outputStream))
-        //    {
-        //       await streamWriter.WriteLineAsync(request);
-        //        await streamWriter.FlushAsync();
-        //   }
-        //}
 
-        attemptReceiveSpatialAnchor();
+        if (_Connected)
+        {
+            attemptReceiveSpatialAnchor();
+        }
+
 
     }
 
     private async void attemptReceiveSpatialAnchor()
     {
 
-        if(_Connected)
+        if (_Connected && !anchorReceived)
+        {
             try
             {
                 using (Stream inputStream = socket.InputStream.AsStreamForRead())
                 {
                     using (var streamReader = new StreamReader(inputStream))
                     {
-                        var bytes = default(byte[]);
-                        using (var memstream = new MemoryStream())
-                        {
-                            await streamReader.BaseStream.CopyToAsync(memstream);
-                            bytes = memstream.ToArray();
-                            //_input = bytes.ToString();
-                            Debug.Log(System.Text.Encoding.ASCII.GetString(bytes));
-                        }
+                    var bytes = default(byte[]);
+
+                        //streamReader.Read(var initialLength);
+                        inputStream.FlushAsync();
+                        myAnchorTransferBatch = await XRAnchorTransferBatch.ImportAsync(inputStream);
+                        streamLength = inputStream.Length;
+                        anchorReceived = true;
 
                     }
                 }
+
+
+                 /*   using (Stream inputStream = socket.InputStream.AsStreamForRead())
+                    {
+                        using (var memstream = new MemoryStream())
+                        {
+                            using (var streamReader = new StreamReader(inputStream))
+                            {
+                            while (true)
+                            {
+                                if (!streamReader.EndOfStream)
+                                {
+                                    await streamReader.BaseStream.CopyToAsync(memstream);
+                                    if (!streamReader.EndOfStream)
+                                    {
+                                        continue;
+                                    }
+                                    else
+                                    {
+                                        break;
+                                    }
+
+                                }
+                                else
+                                {
+                                    continue;
+                                }
+                            }
+                                
+                                myAnchorTransferBatch = await XRAnchorTransferBatch.ImportAsync(memstream);
+                                anchorReceived = true;
+                        }
+                        }
+                    }*/
+
             }
             catch (Exception exception)
             {
                 throw;
             }
+        }
+           
         else
         {
             Debug.Log("No Server Connection Yet");
@@ -158,8 +192,7 @@ public class SocketClient : MonoBehaviour
 
             if (resultTcpClient != null)
             {
-            sendDataToServer(client, data);
-            Debug.Log(receiveDataFromServer(client));
+            receiveDataFromServer(client);
             }
             else
             {
@@ -168,46 +201,64 @@ public class SocketClient : MonoBehaviour
 
     }
 
-    public bool sendDataToServer(TcpClient client, Byte[] data){
-        NetworkStream stream = client.GetStream();
-        uint messageSize = (uint)data.Length;
 
-        data = AddByteToBeginningArray(data, Convert.ToByte(messageSize));
-        stream.Write(data, 0, data.Length);
-        return true;
-    }
-
-    public string receiveDataFromServer(TcpClient client){
+    private async void receiveDataFromServer(TcpClient client){
 
     // Buffer to store the response bytes.
     data = new Byte[256];
-
-    // String to store the response ASCII representation.
-    String responseData = String.Empty;
+    var receiveBuffer = new byte[2048];
+    int bytesRead = 0;
     NetworkStream stream = client.GetStream();
+    char[] inputChar = new char[256];
     // Read the first batch of the TcpServer response bytes.
-    Int32 bytes = stream.Read(data, 0, data.Length);
-    responseData = System.Text.Encoding.ASCII.GetString(data, 0, bytes);
-    return responseData;
+    await stream.ReadAsync(data, 0, 256);
+    Debug.Log("Total Bytes to read: " + System.Text.Encoding.ASCII.GetString(data));
+
+    var bytesLeftToReceive = BitConverter.ToInt32(data, 0);
+
+    if(stream.CanRead){
+    byte[] myReadBuffer = new byte[1024];
+    StringBuilder myCompleteMessage = new StringBuilder();
+    int numberOfBytesRead = 0;
+
+    // Incoming message may be larger than the buffer size.
+    do{
+         await stream.ReadAsync(myReadBuffer, 0, myReadBuffer.Length);
+
+         myCompleteMessage.AppendFormat("{0}", Encoding.ASCII.GetString(myReadBuffer, 0, 32));
     }
+    while(stream.DataAvailable);
+
+    Debug.Log("You received the following message : " + myCompleteMessage);
+    }
+    }
+
 
 #endif
-
-
-    public byte[] AddByteToBeginningArray(byte[] bArray, byte newByte)
-    {
-        byte[] newArray = new byte[bArray.Length + 1];
-        bArray.CopyTo(newArray, 1);
-        newArray[0] = newByte;
-        return newArray;
-
-    }
 
     
     void Update()
     {
 #if !UNITY_EDITOR
-        //attemptReceiveSpatialAnchor();
+        if (anchorReceived)
+        {
+            try
+            {
+                //Debug.Log("Received from server " + Encoding.ASCII.GetString(memstream.ToArray()));
+                //Debug.Log(myAnchorTransferBatch.AnchorNames[0]);
+                Debug.Log("The size of the read stream is: " + streamLength);
+
+            }
+            catch (Exception exception)
+            {
+                Debug.Log(exception);
+            }
+            //attemptReceiveSpatialAnchor();
+        }
+        else
+        {
+
+        }
 #else
 
     

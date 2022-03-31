@@ -35,13 +35,14 @@ public class SocketClient : MonoBehaviour
     private StreamReader reader;
     XRAnchorTransferBatch myAnchorTransferBatch = new XRAnchorTransferBatch();
     long streamLength;
+    bool anchorReceived = false;
 
 #if !UNITY_EDITOR
     StreamSocket socket = new Windows.Networking.Sockets.StreamSocket();
     HostName serverHost = new HostName("192.168.0.162");
     String port = "9999";
     bool _Connected = false;
-    bool anchorReceived = false;
+
 
 #else
     Int32 port = 9999;
@@ -95,6 +96,7 @@ public class SocketClient : MonoBehaviour
 
         if (_Connected)
         {
+            Debug.Log("Connected to Server");
             attemptReceiveSpatialAnchor();
         }
 
@@ -108,54 +110,13 @@ public class SocketClient : MonoBehaviour
         {
             try
             {
-                using (Stream inputStream = socket.InputStream.AsStreamForRead())
+                using (Stream inputStream = socket.InputStream.AsStreamForRead(16384))
                 {
-                    using (var streamReader = new StreamReader(inputStream))
-                    {
-                    var bytes = default(byte[]);
-
-                        //streamReader.Read(var initialLength);
-                        inputStream.FlushAsync();
+                        //await inputStream.FlushAsync();
                         myAnchorTransferBatch = await XRAnchorTransferBatch.ImportAsync(inputStream);
-                        streamLength = inputStream.Length;
+                        
                         anchorReceived = true;
-
-                    }
                 }
-
-
-                 /*   using (Stream inputStream = socket.InputStream.AsStreamForRead())
-                    {
-                        using (var memstream = new MemoryStream())
-                        {
-                            using (var streamReader = new StreamReader(inputStream))
-                            {
-                            while (true)
-                            {
-                                if (!streamReader.EndOfStream)
-                                {
-                                    await streamReader.BaseStream.CopyToAsync(memstream);
-                                    if (!streamReader.EndOfStream)
-                                    {
-                                        continue;
-                                    }
-                                    else
-                                    {
-                                        break;
-                                    }
-
-                                }
-                                else
-                                {
-                                    continue;
-                                }
-                            }
-                                
-                                myAnchorTransferBatch = await XRAnchorTransferBatch.ImportAsync(memstream);
-                                anchorReceived = true;
-                        }
-                        }
-                    }*/
 
             }
             catch (Exception exception)
@@ -211,32 +172,31 @@ public class SocketClient : MonoBehaviour
     NetworkStream stream = client.GetStream();
     char[] inputChar = new char[256];
     // Read the first batch of the TcpServer response bytes.
-    await stream.ReadAsync(data, 0, 256);
-    Debug.Log("Total Bytes to read: " + System.Text.Encoding.ASCII.GetString(data));
-
-    var bytesLeftToReceive = BitConverter.ToInt32(data, 0);
 
     if(stream.CanRead){
     byte[] myReadBuffer = new byte[1024];
     StringBuilder myCompleteMessage = new StringBuilder();
-    int numberOfBytesRead = 0;
 
     // Incoming message may be larger than the buffer size.
-    do{
+    /*do{
          await stream.ReadAsync(myReadBuffer, 0, myReadBuffer.Length);
 
          myCompleteMessage.AppendFormat("{0}", Encoding.ASCII.GetString(myReadBuffer, 0, 32));
     }
     while(stream.DataAvailable);
 
-    Debug.Log("You received the following message : " + myCompleteMessage);
+    Debug.Log(myCompleteMessage.Length);*/
+    StreamReader test = new StreamReader(stream);
+    var testString = await test.ReadToEndAsync();
+    Debug.Log(testString.Length);
+    anchorReceived = true;
     }
     }
 
 
 #endif
 
-    
+
     void Update()
     {
 #if !UNITY_EDITOR
@@ -245,8 +205,7 @@ public class SocketClient : MonoBehaviour
             try
             {
                 //Debug.Log("Received from server " + Encoding.ASCII.GetString(memstream.ToArray()));
-                //Debug.Log(myAnchorTransferBatch.AnchorNames[0]);
-                Debug.Log("The size of the read stream is: " + streamLength);
+                Debug.Log(myAnchorTransferBatch.AnchorNames[0]);
 
             }
             catch (Exception exception)
@@ -260,7 +219,24 @@ public class SocketClient : MonoBehaviour
 
         }
 #else
+        if (anchorReceived)
+        {
+            try
+            {
+                //Debug.Log("Received from server " + Encoding.ASCII.GetString(memstream.ToArray()));
+                //Debug.Log(myAnchorTransferBatch.AnchorNames[0]);
 
+            }
+            catch (Exception exception)
+            {
+                Debug.Log(exception);
+            }
+            //attemptReceiveSpatialAnchor();
+        }
+        else
+        {
+
+        }
     
 #endif
     }

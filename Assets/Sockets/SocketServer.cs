@@ -83,7 +83,7 @@ public class SocketServer : MonoBehaviour
 
 #if !UNITY_EDITOR
         
-        port = "9999";
+        port = "15463";
         listener.ConnectionReceived += Listener_ConnectionReceived;
         listener.Control.KeepAlive = false;
 
@@ -93,8 +93,8 @@ public class SocketServer : MonoBehaviour
 
     try
     {
-     // Set the TcpListener on port 13000.
-     Int32 port = 9999;
+     // Set the TcpListener on port 15463.
+     Int32 port = 15463;
      // TcpListener server = new TcpListener(port);
      server = new TcpListener(System.Net.IPAddress.Any, port);
 
@@ -304,9 +304,9 @@ public class SocketServer : MonoBehaviour
 
 
         tempStream.Position = 0;
-        
+
         //await tempStream.CopyToAsync(socket.OutputStream.AsStreamForWrite(16384));
-        
+
         /* try
         {
             await socket.OutputStream.AsStreamForWrite().FlushAsync();
@@ -319,10 +319,13 @@ public class SocketServer : MonoBehaviour
         }
 
         socket.OutputStream.AsStreamForWrite().Close();*/
+        using (DataWriter dataWriter = new DataWriter(socket.OutputStream))
+        {
+            await tempStream.CopyToAsync(socket.OutputStream.AsStreamForWrite());
+            await dataWriter.StoreAsync();
+        }
 
-        await tempStream.CopyToAsync(socket.OutputStream.AsStreamForWrite());
-        DataWriter dataWriter = new DataWriter(socket.OutputStream);
-        await dataWriter.FlushAsync();
+
 
     }
 #endif

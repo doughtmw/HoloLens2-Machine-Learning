@@ -36,16 +36,17 @@ public class SocketClient : MonoBehaviour
     XRAnchorTransferBatch myAnchorTransferBatch = new XRAnchorTransferBatch();
     long streamLength;
     bool anchorReceived = false;
+    Stream tempStream;
 
 #if !UNITY_EDITOR
     StreamSocket socket = new Windows.Networking.Sockets.StreamSocket();
     HostName serverHost = new HostName("192.168.0.162");
-    String port = "9999";
+    String port = "15463";
     bool _Connected = false;
 
 
 #else
-    Int32 port = 9999;
+    Int32 port = 15463;
     bool _Active;
     string server = "192.168.0.162";
     TcpClient client = new TcpClient();
@@ -110,10 +111,12 @@ public class SocketClient : MonoBehaviour
         {
             try
             {
-                using (Stream inputStream = socket.InputStream.AsStreamForRead(16384))
+                using (Stream inputStream = socket.InputStream.AsStreamForRead())
                 {
-                        //await inputStream.FlushAsync();
-                        myAnchorTransferBatch = await XRAnchorTransferBatch.ImportAsync(inputStream);
+                  
+                    //inputStream.CopyToAsync(tempStream);
+                    myAnchorTransferBatch = await XRAnchorTransferBatch.ImportAsync(inputStream);
+                    inputStream.Close();
                         
                         anchorReceived = true;
                 }
@@ -189,6 +192,8 @@ public class SocketClient : MonoBehaviour
     StreamReader test = new StreamReader(stream);
     var testString = await test.ReadToEndAsync();
     Debug.Log(testString.Length);
+
+    //myAnchorTransferBatch = await XRAnchorTransferBatch.ImportAsync(stream);
     anchorReceived = true;
     }
     }
@@ -224,7 +229,7 @@ public class SocketClient : MonoBehaviour
             try
             {
                 //Debug.Log("Received from server " + Encoding.ASCII.GetString(memstream.ToArray()));
-                //Debug.Log(myAnchorTransferBatch.AnchorNames[0]);
+                Debug.Log(myAnchorTransferBatch.AnchorNames[0]);
 
             }
             catch (Exception exception)

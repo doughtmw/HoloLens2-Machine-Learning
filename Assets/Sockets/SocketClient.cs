@@ -13,6 +13,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using Microsoft.MixedReality.OpenXR.ARFoundation;
+using System.Threading.Tasks;
 
 #if !UNITY_EDITOR
 using Windows.Networking;
@@ -21,22 +22,19 @@ using Windows.Storage.Streams;
 
 #else
 using System.Net.Sockets;
-using System.Threading.Tasks;
+
 #endif
 
 [RequireComponent(typeof(ARAnchorManager))]
+[RequireComponent(typeof(ARAnchor))]
 //Able to act as a reciever 
 public class SocketClient : MonoBehaviour
 {
     public String _input = "Waiting";
     String message;
-    Byte[] data = System.Text.Encoding.ASCII.GetBytes("Hello from the Client");
-    private StreamWriter writer;
-    private StreamReader reader;
     XRAnchorTransferBatch myAnchorTransferBatch = new XRAnchorTransferBatch();
-    long streamLength;
     bool anchorReceived = false;
-    Stream tempStream;
+    MemoryStream tempStream = new MemoryStream();
 
 #if !UNITY_EDITOR
     StreamSocket socket = new Windows.Networking.Sockets.StreamSocket();
@@ -106,25 +104,82 @@ public class SocketClient : MonoBehaviour
 
     private async void attemptReceiveSpatialAnchor()
     {
+        // Buffer to store the response bytes.
+        byte[] lengthBuffer = new byte[256];
+        byte[] singleByte = new byte[1];
+        int bytesRead = 0;
+        int totalBytes = 0;
+        int bufferSize = 8192;
+        double progress = 0;
+        int counter = 0;
+        int streamLength;
+        MemoryStream tempMemStream;
 
         if (_Connected && !anchorReceived)
         {
             try
             {
-                using (Stream inputStream = socket.InputStream.AsStreamForRead())
+                using (Stream dataReader = socket.InputStream.AsStreamForRead())
                 {
-                  
-                    //inputStream.CopyToAsync(tempStream);
-                    myAnchorTransferBatch = await XRAnchorTransferBatch.ImportAsync(inputStream);
-                    inputStream.Close();
-                        
-                        anchorReceived = true;
-                }
+                    
+                    await dataReader.ReadAsync(lengthBuffer, 0, lengthBuffer.Length);
+                    streamLength = BitConverter.ToInt32(lengthBuffer, 0);
+                    byte[] myReadBuffer = new byte[bufferSize];
+                    byte[] tempByteArray = new byte[streamLength];
+                    Debug.Log("Attempting to read anchor of size: " + streamLength);
+                    // Incoming message may be larger than the buffer size.
 
+
+                    while (totalBytes < streamLength)
+                    {
+
+                        bytesRead = await dataReader.ReadAsync(myReadBuffer, 0, bufferSize);
+                        Array.Copy(myReadBuffer, 0, tempByteArray, totalBytes, bytesRead);
+                        totalBytes += bytesRead;
+                        counter += 1;
+
+                        if (counter == 120)
+                        {
+                            progress = (Convert.ToDouble(totalBytes) / Convert.ToDouble(streamLength)) * 100;
+                            Debug.Log("Recv'd " + progress + "% of expected Anchor");
+                            counter = 0;
+                        }
+
+
+                    }
+
+                    tempMemStream = new MemoryStream(tempByteArray);
+                    
+                }
+                Debug.Log("Anchor Received");
+                if (tempMemStream.CanRead)
+                {
+                    Debug.Log("Attempting to import anchor locally...");
+                    myAnchorTransferBatch = await XRAnchorTransferBatch.ImportAsync(tempMemStream);
+                    while (myAnchorTransferBatch == null)
+                    {
+                        Debug.Log("Trying Again...");
+                        myAnchorTransferBatch = await XRAnchorTransferBatch.ImportAsync(tempStream);
+                    }
+
+                    if(myAnchorTransferBatch != null)
+                    {
+                        Debug.Log("Host Anchor Imported to Local System");
+                    }
+                    
+                }
+                else { Debug.Log("tempStream not readable"); }
+
+                anchorReceived = true;
             }
             catch (Exception exception)
             {
                 throw;
+            }
+
+            finally
+            {
+                
             }
         }
            
@@ -169,31 +224,45 @@ public class SocketClient : MonoBehaviour
     private async void receiveDataFromServer(TcpClient client){
 
     // Buffer to store the response bytes.
-    data = new Byte[256];
-    var receiveBuffer = new byte[2048];
+    var lengthBuffer = new byte[256];
     int bytesRead = 0;
+    long totalBytes = 0;
+    int bufferSize = 4056;
+    float progress = 0;
+    int counter = 0;
     NetworkStream stream = client.GetStream();
-    char[] inputChar = new char[256];
     // Read the first batch of the TcpServer response bytes.
 
     if(stream.CanRead){
-    byte[] myReadBuffer = new byte[1024];
-    StringBuilder myCompleteMessage = new StringBuilder();
+    
+    await stream.ReadAsync(lengthBuffer, 0, 256);
+    int streamLength = BitConverter.ToInt32(lengthBuffer, 0);
+    byte[] myReadBuffer = new byte[bufferSize];
+    int streamLengthStart = streamLength;
+    Debug.Log("Attempting to read anchor of size: " + streamLength);
 
     // Incoming message may be larger than the buffer size.
-    /*do{
-         await stream.ReadAsync(myReadBuffer, 0, myReadBuffer.Length);
 
-         myCompleteMessage.AppendFormat("{0}", Encoding.ASCII.GetString(myReadBuffer, 0, 32));
+   while(totalBytes < streamLength)
+    {
+    
+        if(counter == 120){
+        progress = ((float)totalBytes/(float)streamLengthStart) * 100;
+        Debug.Log("Recv'd " + progress);
+        counter = 0;
+        }
+    
+         bytesRead = await stream.ReadAsync(myReadBuffer, 0, myReadBuffer.Length);
+         //Debug.Log("Bytes Read: " + bytesRead);
+         await tempStream.WriteAsync(myReadBuffer, 0, bytesRead);
+         //streamLength -= bytesRead;
+         totalBytes += bytesRead;
+         counter += 1;
+         //Debug.Log("tempStream Length: " + tempStream.Length);
+
     }
-    while(stream.DataAvailable);
-
-    Debug.Log(myCompleteMessage.Length);*/
-    StreamReader test = new StreamReader(stream);
-    var testString = await test.ReadToEndAsync();
-    Debug.Log(testString.Length);
-
-    //myAnchorTransferBatch = await XRAnchorTransferBatch.ImportAsync(stream);
+    Debug.Log("Anchor Received");
+    myAnchorTransferBatch = await XRAnchorTransferBatch.ImportAsync(tempStream);
     anchorReceived = true;
     }
     }
@@ -209,15 +278,14 @@ public class SocketClient : MonoBehaviour
         {
             try
             {
-                //Debug.Log("Received from server " + Encoding.ASCII.GetString(memstream.ToArray()));
                 Debug.Log(myAnchorTransferBatch.AnchorNames[0]);
+                anchorReceived = false;
 
             }
             catch (Exception exception)
             {
                 Debug.Log(exception);
             }
-            //attemptReceiveSpatialAnchor();
         }
         else
         {
@@ -228,8 +296,8 @@ public class SocketClient : MonoBehaviour
         {
             try
             {
-                //Debug.Log("Received from server " + Encoding.ASCII.GetString(memstream.ToArray()));
-                Debug.Log(myAnchorTransferBatch.AnchorNames[0]);
+                Debug.Log("AnchorReceived");
+                //Debug.Log(myAnchorTransferBatch.AnchorNames[0]);
 
             }
             catch (Exception exception)

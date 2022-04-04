@@ -15,6 +15,7 @@ using System.Text;
 using System.Threading;
 using Microsoft.MixedReality.OpenXR.ARFoundation;
 using Microsoft.MixedReality.OpenXR;
+using System.Threading.Tasks;
 
 #if !UNITY_EDITOR
 using Windows.Networking;
@@ -27,7 +28,7 @@ using Windows.Storage.Streams;
 
 #else
 using System.Net.Sockets;
-using System.Threading.Tasks;
+
 
 #endif
 
@@ -39,24 +40,19 @@ using System.Threading.Tasks;
 public class SocketServer : MonoBehaviour
 {
     public String _input = "Waiting";
-    private StreamWriter writer;
-    private StreamReader reader;
     TrackableId myTrackableId;
     XRAnchorTransferBatch myAnchorTransferBatch = new XRAnchorTransferBatch();
     bool localAnchorAdded = false;
     bool localBatchReady = false;
     bool localAnchorStreamCreated = false;
 
-    Stream tempStream;
-    MemoryStream memoryStream = new MemoryStream();
-    Int64 bytesSent;
+    MemoryStream memoryStream;
+    
 
 #if !UNITY_EDITOR
     StreamSocketListener listener = new StreamSocketListener();
     String port;
     String message;
-    Byte[] data;
- 
     StreamSocket clientSocket = new StreamSocket();
 #else
     TcpListener server=null;
@@ -64,16 +60,6 @@ public class SocketServer : MonoBehaviour
     System.Net.Sockets.NetworkStream stream;
     TcpClient client = null;
 #endif
-
-    //define filePath
-    #region Constants to modify
-    private const string SessionFolderRoot = "SavedAnchorBatchs";
-    #endregion
-
-    #region private members
-    private string m_sessionPath;
-    private string m_filePath;
-    #endregion
 
     // Use this for initialization
     async void Start()
@@ -86,42 +72,18 @@ public class SocketServer : MonoBehaviour
         port = "15463";
         listener.ConnectionReceived += Listener_ConnectionReceived;
         listener.Control.KeepAlive = false;
-
-        Listener_Start();
+        await Listener_Start();
 
 #else
 
-    try
-    {
-     // Set the TcpListener on port 15463.
-     Int32 port = 15463;
-     // TcpListener server = new TcpListener(port);
-     server = new TcpListener(System.Net.IPAddress.Any, port);
-
-     // Start listening for client requests.
-     server.Start();
-    }
-    catch(SocketException e)
-    {
-      Debug.Log("SocketException: " + e);
-    }
-
 #endif
-
-
-        var XRSubsystem = CreateXRSubsystem();
-        if (XRSubsystem != null)
-        {
-            XRSubsystem.Start();
-        }
-
-       tryAddLocalAnchor();
+        int success = await tryAddLocalAnchor();
 
     }
 
 
 #if !UNITY_EDITOR
-        private async void Listener_Start()
+        private async Task<bool> Listener_Start()
     {
         Debug.Log("Listener started");
         try
@@ -135,74 +97,63 @@ public class SocketServer : MonoBehaviour
 
         Debug.Log("Listening");
 
-
+        return true;
     }
 
     private async void Listener_ConnectionReceived(StreamSocketListener sender, StreamSocketListenerConnectionReceivedEventArgs args)
     {
+        try
+        {
             clientSocket = args.Socket;
             //None of the Debug Messages here will show on the main thread.
             if (localAnchorStreamCreated)
             {
-            trySendSpatialAnchorToClient(clientSocket);
+                long streamLength = memoryStream.Length;
+                int bytesSent;
+                int bufferSize = 4056;
+                byte[] dataBuffer = new byte[bufferSize];
+                byte[] byteAnchorStreamTemp = memoryStream.ToArray();
+                byte[] finalByteArray = AddByteToArray(byteAnchorStreamTemp, byteAnchorStreamTemp[0]);
+                memoryStream.Close();
+                byte[] lengthBytes = BitConverter.GetBytes(byteAnchorStreamTemp.Length);
+
+                using (Stream dataWriter = clientSocket.OutputStream.AsStreamForWrite())
+                {
+
+                    dataWriter.Write(lengthBytes, 0, lengthBytes.Length);
+                    dataWriter.Flush();
+
+                    await dataWriter.WriteAsync(byteAnchorStreamTemp, 0, byteAnchorStreamTemp.Length);
+                    await dataWriter.FlushAsync();
+                }
+
+
+
+                localBatchReady = true;
+
             }
             else
             {
                 Debug.Log("Connection Received, but no anchor batch ready to send");
-                writer.Write("-1");
+                //clientSocket.WriteAsync(-1);
             }
+        }
+
+        catch(Exception e)
+        {
+            throw;
+        }
+        finally
+        {
+            Debug.Log("Anchor sent to client");
+            clientSocket.Dispose();
+        }
+
     }
 
 
 #else
 
-    private void listenForClientConnection()
-    {
-    // Buffer for reading data
-      Byte[] bytes = new Byte[256];
-      String data = null;
-
-            //Console.Write("Waiting for a connection... ");
-
-            if (!server.Pending())
-            {
-                //Debug.Log("Sorry, no connection requests have arrived");
-            }
-            else
-            {
-            //Accept the pending client connection and return a TcpClient object initialized for communication.
-            client = server.AcceptTcpClient();
-            // Using the RemoteEndPoint property.
-            Console.WriteLine("I am listening for connections on " +
-            IPAddress.Parse(((IPEndPoint)server.LocalEndpoint).Address.ToString()) +
-            "on port number " + ((IPEndPoint)server.LocalEndpoint).Port.ToString());
-
-            data = null;
-
-            // Get a stream object for reading and writing
-            NetworkStream stream = client.GetStream();
-
-            int i;
-
-            // Loop to receive all the data sent by the client.
-            while((i = stream.Read(bytes, 0, bytes.Length))!=0)
-            {
-                // Translate data bytes to a ASCII string.
-                data = System.Text.Encoding.ASCII.GetString(bytes, 0, i);
-                Console.WriteLine("Received: {0}", data);
-
-                // Process the data sent by the client.
-                data = data.ToUpper();
-
-                byte[] msg = System.Text.Encoding.ASCII.GetBytes(data);
-
-                // Send back a response.
-                stream.Write(msg, 0, msg.Length);
-                Debug.Log("Sent: " + data);
-            }
-
-            }
-    }
 #endif
 
     void Update()
@@ -212,16 +163,23 @@ public class SocketServer : MonoBehaviour
 
         if (localBatchReady)
         {
-            Debug.Log("Exported Anchor Batch in Socket Stream");
-            Debug.Log("The size of the written stream is: " + tempStream.Length);
+            Debug.Log("Client Connected! - Exporting Host Anchor");
+            //Debug.Log("The size of the written stream is: " + memoryStream.Length);
             localBatchReady = false;
         }
 
 
 #else
-    listenForClientConnection();
 
 #endif
+    }
+
+    public byte[] AddByteToArray(byte[] bArray, byte newByte)
+    {
+        byte[] newArray = new byte[bArray.Length + 1];
+        bArray.CopyTo(newArray, 1);
+        newArray[0] = newByte;
+        return newArray;
     }
 
     public void StopExchange()
@@ -229,43 +187,16 @@ public class SocketServer : MonoBehaviour
 
 #if UNITY_EDITOR
 
-    try
-    {
-        stream.Close();
-    }
-    catch{}
-
-    try
-    {
-         client.Close();
-    }
-    catch{}
-    try
-    {
-         writer.Close();
-    }
-    catch{} 
-    try
-    {
-        reader.Close();
-    }
-    catch{} 
-
-
-     stream = null;
-
 
 #else
 
         listener.Dispose();
-        writer.Dispose();
-        reader.Dispose();
+
 
             listener = null;
 
 #endif
-        writer = null;
-        reader = null;
+
     }
 
     public void OnDestroy()
@@ -273,62 +204,28 @@ public class SocketServer : MonoBehaviour
         StopExchange();
     }
 
-    async void tryAddLocalAnchor()
+    async Task<int> tryAddLocalAnchor()
     {
 
         Debug.Log("Creating Export Anchor Batch in Socket Stream");
 
-        while (tempStream == null)
+        while (memoryStream == null)
         {
             myTrackableId = this.GetComponent<ARAnchor>().trackableId;
             myAnchorTransferBatch.AddAnchor(myTrackableId, "HostPosition");
-            tempStream = await XRAnchorTransferBatch.ExportAsync(myAnchorTransferBatch);
+            memoryStream = (MemoryStream) await XRAnchorTransferBatch.ExportAsync(myAnchorTransferBatch);  
         }
-
-        //await tempStream.CopyToAsync(memoryStream);
-        if (tempStream != null)
+        if (memoryStream != null)
         {
+            Debug.Log("Anchor written to disk of size: " + memoryStream.Length);
             localAnchorStreamCreated = true;
             Debug.Log("Anchor Copied To Local Stream");
-            //MakeNewSession();
-            //CreateNewAnchorFile(tempStream);
-            //Debug.Log("Local Stream Written To Disk");
 
         }
+
+        return 1;
 
     }
-
-    #if !UNITY_EDITOR
-    async void trySendSpatialAnchorToClient(StreamSocket socket)
-    {
-
-
-        tempStream.Position = 0;
-
-        //await tempStream.CopyToAsync(socket.OutputStream.AsStreamForWrite(16384));
-
-        /* try
-        {
-            await socket.OutputStream.AsStreamForWrite().FlushAsync();
-            Debug.Log("Anchor Sent to Client");
-            localBatchReady = true;
-        }
-        catch (Exception exception)
-        {
-            throw exception;
-        }
-
-        socket.OutputStream.AsStreamForWrite().Close();*/
-        using (DataWriter dataWriter = new DataWriter(socket.OutputStream))
-        {
-            await tempStream.CopyToAsync(socket.OutputStream.AsStreamForWrite());
-            await dataWriter.StoreAsync();
-        }
-
-
-
-    }
-#endif
 
     XRAnchorSubsystem CreateXRSubsystem()
     {
@@ -351,41 +248,5 @@ public class SocketServer : MonoBehaviour
         return null;
     }
 
-    async void MakeNewSession()
-    {
-        string rootPath = "";
-#if WINDOWS_UWP
-            StorageFolder sessionParentFolder = await KnownFolders.PicturesLibrary
-                .CreateFolderAsync(SessionFolderRoot,
-                CreationCollisionOption.OpenIfExists);
-            rootPath = sessionParentFolder.Path;
-#else
-        rootPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), SessionFolderRoot);
-        if (!Directory.Exists(rootPath)) Directory.CreateDirectory(rootPath);
-#endif
-        Directory.CreateDirectory(rootPath);
-        UnityEngine.Debug.Log("Writing anchor data to " + rootPath);
-    }
-
-    async void CreateNewAnchorFile(Stream tempStream)
-    {
-        string rootPath = "";
-        var filename = "CurrentAnchorBatch.dat";
-        m_filePath = Path.Combine(rootPath, filename);
-
-        using (var fileWriter = new FileStream(m_filePath, FileMode.OpenOrCreate))
-        {
-            /*while (tempStream.Position < tempStream.Length)
-            {
-                byte[] byteArray = new byte[] { (byte)tempStream.ReadByte() };
-                await fileWriter.WriteAsync(byteArray, 0, 1);
-            }*/
-            tempStream.Position = 0;
-            await tempStream.CopyToAsync(fileWriter);
-            fileWriter.Close();
-            Debug.Log("Achor written to file");
-        }
-
-    }
 
 }

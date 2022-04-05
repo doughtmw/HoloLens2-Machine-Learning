@@ -105,7 +105,7 @@ public class SocketClient : MonoBehaviour
     private async void attemptReceiveSpatialAnchor()
     {
         // Buffer to store the response bytes.
-        byte[] lengthBuffer = new byte[256];
+        byte[] lengthBuffer = new byte[4];
         byte[] singleByte = new byte[1];
         int bytesRead = 0;
         int totalBytes = 0;
@@ -119,37 +119,37 @@ public class SocketClient : MonoBehaviour
         {
             try
             {
-                using (Stream dataReader = socket.InputStream.AsStreamForRead())
+                using (Stream dataWriter = socket.OutputStream.AsStreamForWrite())
                 {
+                    using (Stream dataReader = socket.InputStream.AsStreamForRead())
+                    {
                     
-                    await dataReader.ReadAsync(lengthBuffer, 0, lengthBuffer.Length);
+
+                        await dataReader.ReadAsync(lengthBuffer, 0, lengthBuffer.Length);
                     streamLength = BitConverter.ToInt32(lengthBuffer, 0);
                     byte[] myReadBuffer = new byte[bufferSize];
                     byte[] tempByteArray = new byte[streamLength];
                     Debug.Log("Attempting to read anchor of size: " + streamLength);
-                    // Incoming message may be larger than the buffer size.
+                        // Incoming message may be larger than the buffer size.
+                        do{
+                            
 
+                            bytesRead = await dataReader.ReadAsync(myReadBuffer, 0, bufferSize);
+                            Array.Copy(myReadBuffer, 0, tempByteArray, totalBytes, bytesRead);
+                            totalBytes += bytesRead;
+                            //counter += 1;
 
-                    while (totalBytes < streamLength)
-                    {
+                            if (counter == 120)
+                            {
+                                //progress = (Convert.ToDouble(totalBytes) / Convert.ToDouble(streamLength)) * 100;
+                                //Debug.Log("Recv'd " + progress + "% of expected Anchor");
+                                //counter = 0;
+                            }
 
-                        bytesRead = await dataReader.ReadAsync(myReadBuffer, 0, bufferSize);
-                        Array.Copy(myReadBuffer, 0, tempByteArray, totalBytes, bytesRead);
-                        totalBytes += bytesRead;
-                        counter += 1;
+                        } while (totalBytes < streamLength) ;
 
-                        if (counter == 120)
-                        {
-                            progress = (Convert.ToDouble(totalBytes) / Convert.ToDouble(streamLength)) * 100;
-                            Debug.Log("Recv'd " + progress + "% of expected Anchor");
-                            counter = 0;
-                        }
-
-
+                            tempMemStream = new MemoryStream(tempByteArray);
                     }
-
-                    tempMemStream = new MemoryStream(tempByteArray);
-                    
                 }
                 Debug.Log("Anchor Received");
                 if (tempMemStream.CanRead)
@@ -159,7 +159,7 @@ public class SocketClient : MonoBehaviour
                     while (myAnchorTransferBatch == null)
                     {
                         Debug.Log("Trying Again...");
-                        myAnchorTransferBatch = await XRAnchorTransferBatch.ImportAsync(tempStream);
+                        myAnchorTransferBatch = await XRAnchorTransferBatch.ImportAsync(tempMemStream);
                     }
 
                     if(myAnchorTransferBatch != null)

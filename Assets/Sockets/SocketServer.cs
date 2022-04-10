@@ -204,13 +204,13 @@ public class SocketServer : MonoBehaviour
 
         while (memoryStream == null)
         {
-            myTrackableId = GameObject.Find("AnchorCube").GetComponent<ARAnchor>().trackableId;
-            myAnchorTransferBatch.AddAnchor(myTrackableId, "AnchorCubePosition");
+            myTrackableId = GameObject.Find("AnchorParent").GetComponent<ARAnchor>().trackableId;
+            myAnchorTransferBatch.AddAnchor(myTrackableId, "ParentAnchor");
             memoryStream = (MemoryStream) await XRAnchorTransferBatch.ExportAsync(myAnchorTransferBatch);  
         }
         if (memoryStream != null)
         {
-            Debug.Log("Anchor written to disk of size: " + memoryStream.Length);
+            Debug.Log("Anchor written to disk of size: " + memoryStream.Length + " bytes");
             localAnchorStreamCreated = true;
             Debug.Log("Anchor Copied To Local Stream");
 

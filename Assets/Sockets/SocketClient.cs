@@ -129,7 +129,7 @@ public class SocketClient : MonoBehaviour
                     streamLength = BitConverter.ToInt32(lengthBuffer, 0);
                     byte[] myReadBuffer = new byte[bufferSize];
                     byte[] tempByteArray = new byte[streamLength];
-                    Debug.Log("Attempting to read anchor of size: " + streamLength);
+                    Debug.Log("Attempting to read anchor of size: " + streamLength + " bytes");
                         // Incoming message may be larger than the buffer size.
                         do{
                             
@@ -137,13 +137,13 @@ public class SocketClient : MonoBehaviour
                             bytesRead = await dataReader.ReadAsync(myReadBuffer, 0, bufferSize);
                             Array.Copy(myReadBuffer, 0, tempByteArray, totalBytes, bytesRead);
                             totalBytes += bytesRead;
-                            //counter += 1;
+                            counter += 1;
 
                             if (counter == 120)
                             {
-                                //progress = (Convert.ToDouble(totalBytes) / Convert.ToDouble(streamLength)) * 100;
-                                //Debug.Log("Recv'd " + progress + "% of expected Anchor");
-                                //counter = 0;
+                                progress = (Convert.ToDouble(totalBytes) / Convert.ToDouble(streamLength)) * 100;
+                                Debug.Log("Recv'd " + progress + "% of expected Anchor");
+                                counter = 0;
                             }
 
                         } while (totalBytes < streamLength) ;
@@ -278,7 +278,7 @@ public class SocketClient : MonoBehaviour
         {
             try
             {
-                Debug.Log(myAnchorTransferBatch.AnchorNames[0]);
+                Debug.Log("Received Anchor named:" + myAnchorTransferBatch.AnchorNames[0]);
                 anchorReceived = false;
 
             }

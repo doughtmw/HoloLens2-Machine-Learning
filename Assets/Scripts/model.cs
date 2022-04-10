@@ -1,4 +1,11 @@
-﻿// Adapted from the WinML MNIST sample 
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.XR;
+
+// Adapted from the WinML MNIST sample 
 // https://github.com/microsoft/Windows-Machine-Learning/tree/master/Samples/MNIST
 
 #if ENABLE_WINMD_SUPPORT
@@ -37,12 +44,16 @@ public sealed class CustomNetworkModel
 
     public async Task<CustomNetworkOutput> EvaluateAsync(CustomNetworkInput input)
     {
+ 
+
         // Ensure the input and output fields are bound to the correct
         // layer names in the onnx model
         binding.Bind("input_2", input.features);
         var result = await session.EvaluateAsync(binding, "0");
         var output = new CustomNetworkOutput();
+        Debug.Log(result.Outputs.ToString());
         output.prediction = result.Outputs["Identity"] as TensorFloat;
+
         return output;
     }
 }

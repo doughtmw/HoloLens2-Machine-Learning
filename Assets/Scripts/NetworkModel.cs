@@ -25,11 +25,13 @@ public struct NetworkResult
         PredictionLabel = pred;
         PredictionProbability = prob;
         PredictionTime = time;
-    }
+        //PredictionBbox = boundingbox;
+}
 
     public string PredictionLabel { get; }
     public float PredictionProbability { get; }
     public long PredictionTime { get; }
+    //public List<float> PredictionBbox { get; }
 }
 
 public class NetworkModel
@@ -37,6 +39,7 @@ public class NetworkModel
     public string OnnxFileName = "model.onnx";
     public string LabelsFileName = "Labels.json";
     public float DetectionThreshold = 0.5f;
+    public float IOU_threshold = 0.45f;
 
     private List<string> _labels = new List<string>();
     private NetworkResult _networkResult;

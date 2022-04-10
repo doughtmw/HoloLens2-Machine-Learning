@@ -200,7 +200,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &577346161
 Transform:
   m_ObjectHideFlags: 0
@@ -545,6 +545,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: DebugWindow
       objectReference: {fileID: 0}
+    - target: {fileID: 4679913627488335819, guid: 59cc8aa8819826949aab4c10b20639ab,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 4679913628774560332, guid: 59cc8aa8819826949aab4c10b20639ab,
         type: 3}
       propertyPath: m_Mesh
@@ -759,6 +764,7 @@ GameObject:
   - component: {fileID: 1193893266}
   - component: {fileID: 1193893265}
   - component: {fileID: 1193893264}
+  - component: {fileID: 1193893267}
   m_Layer: 5
   m_Name: Canvas
   m_TagString: Untagged
@@ -847,6 +853,18 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 0
   m_TargetDisplay: 0
+--- !u!114 &1193893267
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1193893262}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff4e3b9019304b5aaec5664de0778d21, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1592636813
 GameObject:
   m_ObjectHideFlags: 0
@@ -863,7 +881,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1592636814
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4689,7 +4707,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8977622279199533163}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0.1}
+  m_LocalPosition: {x: 0, y: -0.005, z: 0.1}
   m_LocalScale: {x: 2.33, y: 2.33, z: 2.33}
   m_Children:
   - {fileID: 3145463150858415776}
@@ -4715,7 +4733,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!1 &9082959306921677087
 GameObject:
   m_ObjectHideFlags: 0

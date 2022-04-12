@@ -3,32 +3,41 @@
 // https://github.com/reneschulte/WinMLExperiments/
 
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 public class NetworkBehaviour : MonoBehaviour
 {
     // Public fields
-    public float ProbabilityThreshold = 0.5f;
-    public Vector2 InputFeatureSize = new Vector2(224, 224);
-    public Text StatusBlock;
+    //public float ProbabilityThreshold = 0.5f;
+    public Vector2 InputFeatureSize = new Vector2(416, 416);
+    public GameObject objectOutlineCube;
+    static public List<GameObject> objectList;
 
     // Private fields
     private NetworkModel _networkModel;
     private MediaCaptureUtility _mediaCaptureUtility;
     private bool _isRunning = false;
+    private Camera cam;
 
     #region UnityMethods
     async void Start()
     {
+
+        cam = Camera.main;
+        objectList = new List<GameObject>();
         try
         {
             // Create a new instance of the network model class
             // and asynchronously load the onnx model
             _networkModel = new NetworkModel();
-            await _networkModel.LoadModelAsync();
-            StatusBlock.text = $"Loaded model. Starting camera...";
+#if ENABLE_WINMD_SUPPORT
+            await _networkModel.InitModelAsync();
+#endif
+            Debug.Log("Loaded model. Starting camera...");
 
 #if ENABLE_WINMD_SUPPORT
             // Configure camera to return frames fitting the model input size
@@ -38,13 +47,13 @@ public class NetworkBehaviour : MonoBehaviour
                 _mediaCaptureUtility = new MediaCaptureUtility();
                 await _mediaCaptureUtility.InitializeMediaFrameReaderAsync(
                     (uint)InputFeatureSize.x, (uint)InputFeatureSize.y);
-                StatusBlock.text = $"Camera started. Running!";
+                Debug.Log("Camera started. Running!");
 
                 Debug.Log("Successfully initialized frame reader.");
             }
             catch (Exception ex)
             {
-                StatusBlock.text = $"Failed to start camera: {ex.Message}. Using loaded/picked image.";
+                Debug.Log("Failed to start camera: {ex.Message}. Using loaded/picked image.");
 
             }
 
@@ -61,6 +70,7 @@ public class NetworkBehaviour : MonoBehaviour
                     {
                         using (var videoFrame = _mediaCaptureUtility.GetLatestFrame())
                         {
+                            Debug.Log("Evaluating Frame....");
                             await EvaluateFrame(videoFrame);
                         }
                     }
@@ -70,12 +80,12 @@ public class NetworkBehaviour : MonoBehaviour
                     }
                 }
             });
-#endif 
+#endif
         }
         catch (Exception ex)
         {
-            StatusBlock.text = $"Error init: {ex.Message}";
-            Debug.LogError($"Failed to start model inference: {ex}");
+            Debug.Log("Error init:" +  ex.Message);
+            Debug.Log($"Failed to start model inference: {ex}");
         }
     }
 
@@ -86,6 +96,11 @@ public class NetworkBehaviour : MonoBehaviour
         {
             await _mediaCaptureUtility.StopMediaFrameReaderAsync();
         }
+    }
+
+    void Update()
+    {
+
     }
     #endregion
 
@@ -100,9 +115,25 @@ public class NetworkBehaviour : MonoBehaviour
             // Update the UI with prediction
             UnityEngine.WSA.Application.InvokeOnAppThread(() =>
             {
-                StatusBlock.text = $"Label: {result.PredictionLabel} " +
-                $"Probability: {Math.Round(result.PredictionProbability, 3) * 100}% " +
-                $"Inference time: {result.PredictionTime} ms";
+                if (result.Count > 0)
+                {
+
+                    if (result[0].label != "None")
+                    {
+                        //foreach (GameObject tempObject in objectList)
+                        //{
+                        //    Destroy(tempObject);
+                        //}
+                        GameObject newObject = Instantiate(objectOutlineCube, cam.ScreenToWorldPoint(new Vector3(result[0].bbox[0] / cam.pixelWidth, result[0].bbox[1] / cam.pixelHeight, cam.nearClipPlane)), Quaternion.identity);
+                        newObject.GetComponentInChildren<TextMeshPro>().SetText(result[0].label);
+                        //objectList.Add(newObject);
+                    }
+                }
+                else
+                {
+                    GameObject.Find("OutputWindow").GetComponent<TextMeshPro>().SetText("Nothing Detected in Current Frame");
+                }
+
             }, false);
         }
         catch (Exception ex)

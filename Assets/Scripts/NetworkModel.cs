@@ -150,21 +150,8 @@ public class NetworkModel
     private async Task<List<float>> EvaluateFrame(VideoFrame frame)
         {
 
-        // Retrieve the first input feature which is an image
-        _inputImageDescription =
-            _inputFeatures.FirstOrDefault(feature => feature.Kind == LearningModelFeatureKind.Image)
-            as ImageFeatureDescriptor;
-
-        // Retrieve the first output feature which is a tensor
-        _outputImageDescription =
-            _outputFeatures.FirstOrDefault(feature => feature.Kind == LearningModelFeatureKind.Tensor)
-            as TensorFeatureDescriptor;
-
-
             _binding.Clear();
             _binding.Bind("image", frame);
-            //_binding.Bind(_inputImageDescription.Name, frame);
-            //_binding.Bind(_outputImageDescription.Name, _outputFrame);
 
             var results = await _session.EvaluateAsync(_binding, "");
 

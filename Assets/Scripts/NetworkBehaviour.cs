@@ -16,6 +16,8 @@ public class NetworkBehaviour : MonoBehaviour
     public Vector2 InputFeatureSize = new Vector2(416, 416);
     public GameObject objectOutlineCube;
     static public List<GameObject> objectList;
+    int samplingInterval = 30;
+    int counter = 0;
 
     // Private fields
     private NetworkModel _networkModel;
@@ -61,25 +63,6 @@ public class NetworkBehaviour : MonoBehaviour
             // and asynchronously evaluate
             Debug.Log("Begin performing inference in frame grab loop.");
 
-            _isRunning = true;
-            await Task.Run(async () =>
-            {
-                while (_isRunning)
-                {
-                    if (_mediaCaptureUtility.IsCapturing)
-                    {
-                        using (var videoFrame = _mediaCaptureUtility.GetLatestFrame())
-                        {
-                            Debug.Log("Evaluating Frame....");
-                            await EvaluateFrame(videoFrame);
-                        }
-                    }
-                    else
-                    {
-                        return;
-                    }
-                }
-            });
 #endif
         }
         catch (Exception ex)
@@ -98,9 +81,32 @@ public class NetworkBehaviour : MonoBehaviour
         }
     }
 
-    void Update()
+    async void Update()
     {
+#if ENABLE_WINMD_SUPPORT
+        _isRunning = true;
+        counter += 1;
+        if (_isRunning && counter == samplingInterval)
+        {
+            counter = 0;
+            await Task.Run(async () =>
+            {
+                if (_mediaCaptureUtility.IsCapturing)
+                {
+                    using (var videoFrame = _mediaCaptureUtility.GetLatestFrame())
+                    {
+                        //Debug.Log("Evaluating Frame....");
+                        await EvaluateFrame(videoFrame);
+                    }
+                }
 
+                else
+                {
+                    return;
+                }
+            });
+        }
+#endif
     }
     #endregion
 
@@ -120,13 +126,9 @@ public class NetworkBehaviour : MonoBehaviour
 
                     if (result[0].label != "None")
                     {
-                        //foreach (GameObject tempObject in objectList)
-                        //{
-                        //    Destroy(tempObject);
-                        //}
+
                         GameObject newObject = Instantiate(objectOutlineCube, cam.ScreenToWorldPoint(new Vector3(result[0].bbox[0] / cam.pixelWidth, result[0].bbox[1] / cam.pixelHeight, cam.nearClipPlane)), Quaternion.identity);
                         newObject.GetComponentInChildren<TextMeshPro>().SetText(result[0].label);
-                        //objectList.Add(newObject);
                     }
                 }
                 else

@@ -7,7 +7,14 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Windows.WebCam;
 using TMPro;
+using System.Linq;
+using System.Runtime.InteropServices;
+
+#if ENABLE_WINMD_SUPPORT
+using HL2UnityPlugin;
+#endif
 
 public class NetworkBehaviour : MonoBehaviour
 {
@@ -24,12 +31,38 @@ public class NetworkBehaviour : MonoBehaviour
     private MediaCaptureUtility _mediaCaptureUtility;
     private bool _isRunning = false;
     private Camera cam;
+    private PhotoCapture photoCaptureObject = null;
+    List<NetworkResult> result = null;
+    bool enablePointCloud = true;
+    Vector3 currentPosition;
+
+#if ENABLE_WINMD_SUPPORT
+    HL2ResearchMode researchMode;
+    Windows.Perception.Spatial.SpatialCoordinateSystem unityWorldOrigin;
+    byte[] frameTexture;
+#endif
 
     #region UnityMethods
+
+    private void Awake()
+    {
+#if ENABLE_WINMD_SUPPORT
+#if UNITY_2020_1_OR_NEWER // note: Unity 2021.2 and later not supported
+        IntPtr WorldOriginPtr = UnityEngine.XR.WindowsMR.WindowsMREnvironment.OriginSpatialCoordinateSystem;
+        unityWorldOrigin = Marshal.GetObjectForIUnknown(WorldOriginPtr) as Windows.Perception.Spatial.SpatialCoordinateSystem;
+        //unityWorldOrigin = Windows.Perception.Spatial.SpatialLocator.GetDefault().CreateStationaryFrameOfReferenceAtCurrentLocation().CoordinateSystem;
+#else
+        IntPtr WorldOriginPtr = UnityEngine.XR.WSA.WorldManager.GetNativeISpatialCoordinateSystemPtr();
+        unityWorldOrigin = Marshal.GetObjectForIUnknown(WorldOriginPtr) as Windows.Perception.Spatial.SpatialCoordinateSystem;
+#endif
+#endif
+    }
     async void Start()
     {
 
         cam = Camera.main;
+        //PhotoCapture.CreateAsync(false, OnPhotoCaptureCreated);
+
         objectList = new List<GameObject>();
         try
         {
@@ -59,9 +92,19 @@ public class NetworkBehaviour : MonoBehaviour
 
             }
 
-            // Run processing loop in separate parallel Task, get the latest frame
-            // and asynchronously evaluate
-            Debug.Log("Begin performing inference in frame grab loop.");
+
+        researchMode = new HL2ResearchMode();
+
+        // Depth sensor should be initialized in only one mode
+        researchMode.InitializeLongDepthSensor();
+        
+        researchMode.InitializeSpatialCamerasFront();
+        researchMode.SetReferenceCoordinateSystem(unityWorldOrigin);
+        researchMode.SetPointCloudDepthOffset(0);
+
+        // Depth sensor initialization
+        researchMode.StartLongDepthSensorLoop(enablePointCloud);
+        researchMode.StartSpatialCamerasFrontLoop();
 
 #endif
         }
@@ -86,17 +129,24 @@ public class NetworkBehaviour : MonoBehaviour
 #if ENABLE_WINMD_SUPPORT
         _isRunning = true;
         counter += 1;
+        int depthChannelStride = 320 * 288;
+        RaycastHit hit;
+        int layerMask = 1 <<31;
+
         if (_isRunning && counter == samplingInterval)
         {
             counter = 0;
-            await Task.Run(async () =>
-            {
+            //await Task.Run(async () =>
+            //{
+                
                 if (_mediaCaptureUtility.IsCapturing)
                 {
                     using (var videoFrame = _mediaCaptureUtility.GetLatestFrame())
                     {
-                        //Debug.Log("Evaluating Frame....");
+                        currentPosition = cam.transform.position;
                         await EvaluateFrame(videoFrame);
+                        frameTexture = researchMode.GetLongDepthMapTextureBuffer();
+
                     }
                 }
 
@@ -104,7 +154,35 @@ public class NetworkBehaviour : MonoBehaviour
                 {
                     return;
                 }
-            });
+            //});
+
+            if (result.Count > 0)
+            {
+
+                 if (result[0].label != "None")
+                 {
+                        //Depth frames are 320x288, convert to allow for accessing correct byte in byte[] of depths
+                        int depthPixel = (int)Math.Round((result[0].bbox[0]/13)*320 + (result[0].bbox[1]/13)*288);
+                        Debug.Log("BBox x coord is: " + result[0].bbox[0] + " and BBox y coord is :" + result[0].bbox[1] + " and the width is: " + result[0].bbox[2] + " and the height is: " + result[0].bbox[3]);
+
+                        Ray ray = cam.ViewportPointToRay(new Vector3(result[0].bbox[0]/416, result[0].bbox[1]/416, 0));
+                        //Vector3 tempLocation = ray.origin + (ray.direction * BitConverter.ToSingle(frameTexture, depthPixel));
+                        //Vector3 tempLocation = ray.origin + (ray.direction * 1);
+    
+                        if (Physics.Raycast(ray, out hit)){
+                            Vector3 tempLocation = ray.origin + (ray.direction * hit.distance);
+                            GameObject newObject = Instantiate(objectOutlineCube, tempLocation, Quaternion.identity);
+                            newObject.GetComponentInChildren<TextMeshPro>().SetText(result[0].label);
+                            Debug.Log("Created 3D Bounding Box at " + tempLocation);
+   
+                            }
+
+                  }
+            }
+            else
+            {
+                    GameObject.Find("OutputWindow").GetComponent<TextMeshPro>().SetText("Nothing Detected in Current Frame");
+            }
         }
 #endif
     }
@@ -116,25 +194,12 @@ public class NetworkBehaviour : MonoBehaviour
         try
         {
             // Get the current network prediction from model and input frame
-            var result = await _networkModel.EvaluateVideoFrameAsync(videoFrame);
+            result = await _networkModel.EvaluateVideoFrameAsync(videoFrame);
 
             // Update the UI with prediction
             UnityEngine.WSA.Application.InvokeOnAppThread(() =>
             {
-                if (result.Count > 0)
-                {
 
-                    if (result[0].label != "None")
-                    {
-
-                        GameObject newObject = Instantiate(objectOutlineCube, cam.ScreenToWorldPoint(new Vector3(result[0].bbox[0] / cam.pixelWidth, result[0].bbox[1] / cam.pixelHeight, cam.nearClipPlane)), Quaternion.identity);
-                        newObject.GetComponentInChildren<TextMeshPro>().SetText(result[0].label);
-                    }
-                }
-                else
-                {
-                    GameObject.Find("OutputWindow").GetComponent<TextMeshPro>().SetText("Nothing Detected in Current Frame");
-                }
 
             }, false);
         }
@@ -145,4 +210,5 @@ public class NetworkBehaviour : MonoBehaviour
     }
 
 #endif
+
 }

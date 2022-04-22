@@ -86,10 +86,7 @@ public class NetworkModel
     private LearningModel _model;
     private LearningModelSession _session;
     private LearningModelBinding _binding;
-    List<ILearningModelFeatureDescriptor> _inputFeatures;
-    List<ILearningModelFeatureDescriptor> _outputFeatures;
-    ImageFeatureDescriptor _inputImageDescription;
-    TensorFeatureDescriptor _outputImageDescription;
+
 #endif
 
 
@@ -104,10 +101,8 @@ public class NetworkModel
        // var device = new LearningModelDevice(LearningModelDeviceKind.Cpu);
         _session = new LearningModelSession(_model);
         _binding = new LearningModelBinding(_session);
-        _inputFeatures = _model.InputFeatures.ToList();
-        _outputFeatures = _model.OutputFeatures.ToList();
-    }
 
+    }
     public async Task<List<NetworkResult>> EvaluateVideoFrameAsync(VideoFrame inputFrame)
     {
         // Sometimes on HL RS4 the D3D surface returned is null, so simply skip those frames
@@ -115,10 +110,10 @@ public class NetworkModel
         {
             UnityEngine.Debug.Log("EvaluateVideoFrameAsync: No detection, null frame or model not initialized.");
             var tempResult = new NetworkResult("None", new List<float>(), 0);
-            List<NetworkResult> tempResultList = new List<NetworkResult>();
+           List<NetworkResult> tempResultList = new List<NetworkResult>();
             tempResultList.Add(tempResult);
             return tempResultList;
-        }
+       }
         
         try{
 
@@ -147,7 +142,7 @@ public class NetworkModel
 
     }
 
-    private async Task<List<float>> EvaluateFrame(VideoFrame frame)
+   private async Task<List<float>> EvaluateFrame(VideoFrame frame)
         {
 
             _binding.Clear();
@@ -298,7 +293,7 @@ public class NetworkModel
  
         float threshold = 0.5f;
         List<NetworkResult> detections = new List<NetworkResult>();
-        //this.OverlayCanvas.Children.Clear();
+
         for (int row = 0; row < ROW_COUNT; row++)
         {
             for (int column = 0; column < COL_COUNT; column++)
@@ -322,8 +317,10 @@ public class NetworkModel
                         continue;
 
                     List<float> tempBbox = new List<float>();
-                    tempBbox.Add((mappedBoundingBox.X - mappedBoundingBox.Width / 2));
-                    tempBbox.Add((mappedBoundingBox.Y - mappedBoundingBox.Height / 2));
+                    //tempBbox.Add((mappedBoundingBox.X - mappedBoundingBox.Width / 2));
+                    //tempBbox.Add((mappedBoundingBox.Y - mappedBoundingBox.Height / 2));
+                    tempBbox.Add(mappedBoundingBox.X);
+                    tempBbox.Add(mappedBoundingBox.Y);
                     tempBbox.Add(mappedBoundingBox.Width);
                     tempBbox.Add(mappedBoundingBox.Height);
 

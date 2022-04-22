@@ -124,10 +124,7 @@ public class NetworkModel
         // Sometimes on HL RS4 the D3D surface returned is null, so simply skip those frames
         if (_model == null || inputFrame == null || (inputFrame.Direct3DSurface == null && inputFrame.SoftwareBitmap == null))
         {
-            UnityEngine.Debug.Log("EvaluateVideoFrameAsync: No detection, null frame or model not initialized.");
-            var tempResult = new NetworkResult("None", new List<float>(), 0);
            List<NetworkResult> tempResultList = new List<NetworkResult>();
-            tempResultList.Add(tempResult);
             return tempResultList;
        }
         
@@ -144,15 +141,7 @@ public class NetworkModel
 
          catch (Exception ex)
         {
-
-             UnityEngine.WSA.Application.InvokeOnAppThread(() =>
-            {
-                UnityEngine.Debug.Log(ex.Message + ex.StackTrace);
-            }, false);
-
-            var tempResult = new NetworkResult("None - Exception Thrown", new List<float>(), 0);
             List<NetworkResult> tempResultList = new List<NetworkResult>();
-            tempResultList.Add(tempResult);
             return tempResultList;
         }
 

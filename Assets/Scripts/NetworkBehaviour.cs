@@ -162,20 +162,17 @@ public class NetworkBehaviour : MonoBehaviour
 
                 else
                 {
-                    return;
+                    //return;
                 }
 
-            if (result.Count > 0)
+            if (result.Count != 0)
             {
+                     Debug.Log("BBox x coord is: " + result[0].bbox[0] + " and BBox y coord is :" + result[0].bbox[1] + " and the width is: " + result[0].bbox[2] +
+                      " and the height is: " + result[0].bbox[3]);
 
-                 if (result[0].label != "None")
-                 {
-                        Debug.Log("BBox x coord is: " + result[0].bbox[0] + " and BBox y coord is :" + result[0].bbox[1] + " and the width is: " + result[0].bbox[2] +
-                        " and the height is: " + result[0].bbox[3]);
-
-                        //This thing here needs to be looked at, specifically the y values, input to ViewportPointToRay is a value, 0 to 1, that represents the area of the respective axis.
-                        //Something is wrong with the way the y axis is caluculated when object is low on the frame
-                        Ray ray = newCamera.ViewportPointToRay(new Vector3(result[0].bbox[0]/InputFeatureSize.x, result[0].bbox[1]/InputFeatureSize.y, 0));
+                     //This thing here needs to be looked at, specifically the y values, input to ViewportPointToRay is a value, 0 to 1, that represents the area of the respective axis.
+                     //Something is wrong with the way the y axis is caluculated when object is low on the frame
+                     Ray ray = newCamera.ViewportPointToRay(new Vector3(result[0].bbox[0]/InputFeatureSize.x, result[0].bbox[1]/InputFeatureSize.y, 0));
 
                     //We use a ray from the viewport at the direction of the detection in 2D space to determine depth.  The first thing the ray hits, the intended object, 
                     //becomes the 3D coordinate of the object
@@ -192,20 +189,19 @@ public class NetworkBehaviour : MonoBehaviour
                         newObject.GetComponent<BoundingBoxScript>().networkResultWithLocation = new NetworkResultWithLocation(result[0].label, result[0].bbox, result[0].prob, newObject);
                         resultWithLocation.Add(new NetworkResultWithLocation(result[0].label, result[0].bbox, result[0].prob, newObject));
                     }
-
-                  }
             }
             else
             {
-                    GameObject.Find("OutputWindow").GetComponent<TextMeshPro>().SetText("Nothing Detected in Current Frame");
+                    //GameObject.Find("OutputWindow").GetComponent<TextMeshPro>().SetText("Nothing Detected in Current Frame");
             }
-        //Housekeeping to remove any list entry whose GameObject was deleted during a collision
-            foreach(NetworkResultWithLocation result in resultWithLocation){
-                if(result.gameObject == null){
-                    resultWithLocation.Remove(result);  
+            //Housekeeping to remove any list entry whose GameObject was deleted during a collision
+
+            foreach(NetworkResultWithLocation detection in resultWithLocation){
+                if(detection.gameObject == null){
+                    resultWithLocation.Remove(detection);  
                 }
             }
-            //Destroy(cameraGameObject);
+            result.Clear();
             //});
 
         }

@@ -35,6 +35,22 @@ public struct NetworkResult
     }
 }
 
+public struct NetworkResultWithLocation
+{
+    public string label;
+    public List<float> bbox;
+    public double prob;
+    GameObject gameObject;
+
+    public NetworkResultWithLocation(string inlabel, List<float> inbbox, double inprob, GameObject inObject)
+    {
+        label = inlabel;
+        bbox = inbbox;
+        prob = inprob;
+        gameObject = inObject;
+    }
+}
+
 public class DimensionsBase
 {
     public float X { get; set; }

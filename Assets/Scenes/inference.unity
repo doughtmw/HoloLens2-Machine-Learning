@@ -230,6 +230,8 @@ MonoBehaviour:
   InputFeatureSize: {x: 416, y: 416}
   objectOutlineCube: {fileID: 1077441217099968542, guid: 31b29c7276a135840ac150a6d8de480e,
     type: 3}
+  tempCamera: {fileID: 4566888467056958142, guid: e337480137f004c49bddcde5c7736124,
+    type: 3}
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0

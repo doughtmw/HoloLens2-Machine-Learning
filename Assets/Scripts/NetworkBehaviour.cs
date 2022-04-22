@@ -19,10 +19,9 @@ using HL2UnityPlugin;
 public class NetworkBehaviour : MonoBehaviour
 {
     // Public fields
-    //public float ProbabilityThreshold = 0.5f;
     public Vector2 InputFeatureSize = new Vector2(416, 416);
     public GameObject objectOutlineCube;
-    static public List<GameObject> objectList;
+    public GameObject tempCamera;
     int samplingInterval = 30;
     int counter = 0;
 
@@ -33,8 +32,15 @@ public class NetworkBehaviour : MonoBehaviour
     private Camera cam;
     private PhotoCapture photoCaptureObject = null;
     List<NetworkResult> result = null;
+    List<NetworkResultWithLocation> resultWithLocation = null;
     bool enablePointCloud = true;
     Vector3 currentPosition;
+    Quaternion currentRotation;
+    float cameraHeight;
+    float cameraWidth;
+    GameObject cameraGameObject;
+    Camera newCamera;
+
 
 #if ENABLE_WINMD_SUPPORT
     HL2ResearchMode researchMode;
@@ -61,9 +67,9 @@ public class NetworkBehaviour : MonoBehaviour
     {
 
         cam = Camera.main;
-        //PhotoCapture.CreateAsync(false, OnPhotoCaptureCreated);
+        cameraHeight = Camera.main.orthographicSize * 2.0f;
+        cameraWidth = cameraHeight * Camera.main.aspect;
 
-        objectList = new List<GameObject>();
         try
         {
             // Create a new instance of the network model class
@@ -131,7 +137,6 @@ public class NetworkBehaviour : MonoBehaviour
         counter += 1;
         int depthChannelStride = 320 * 288;
         RaycastHit hit;
-        int layerMask = 1 <<31;
 
         if (_isRunning && counter == samplingInterval)
         {
@@ -144,9 +149,14 @@ public class NetworkBehaviour : MonoBehaviour
                     using (var videoFrame = _mediaCaptureUtility.GetLatestFrame())
                     {
                         currentPosition = cam.transform.position;
+                        currentRotation = cam.transform.rotation;
+                        cameraGameObject = new GameObject();
+                        newCamera = cameraGameObject.AddComponent<Camera>();
+                        newCamera.enabled = false;
+                        newCamera.transform.position = currentPosition;
+                        newCamera.transform.rotation = currentRotation;
                         await EvaluateFrame(videoFrame);
-                        frameTexture = researchMode.GetLongDepthMapTextureBuffer();
-
+                        
                     }
                 }
 
@@ -154,27 +164,27 @@ public class NetworkBehaviour : MonoBehaviour
                 {
                     return;
                 }
-            //});
 
             if (result.Count > 0)
             {
 
                  if (result[0].label != "None")
                  {
-                        //Depth frames are 320x288, convert to allow for accessing correct byte in byte[] of depths
-                        int depthPixel = (int)Math.Round((result[0].bbox[0]/13)*320 + (result[0].bbox[1]/13)*288);
-                        Debug.Log("BBox x coord is: " + result[0].bbox[0] + " and BBox y coord is :" + result[0].bbox[1] + " and the width is: " + result[0].bbox[2] + " and the height is: " + result[0].bbox[3]);
+                        Debug.Log("BBox x coord is: " + result[0].bbox[0] + " and BBox y coord is :" + result[0].bbox[1] + " and the width is: " + result[0].bbox[2] +
+                        " and the height is: " + result[0].bbox[3]);
 
-                        Ray ray = cam.ViewportPointToRay(new Vector3(result[0].bbox[0]/416, result[0].bbox[1]/416, 0));
-                        //Vector3 tempLocation = ray.origin + (ray.direction * BitConverter.ToSingle(frameTexture, depthPixel));
-                        //Vector3 tempLocation = ray.origin + (ray.direction * 1);
-    
+                        Ray ray = newCamera.ViewportPointToRay(new Vector3(result[0].bbox[0]/InputFeatureSize.x, result[0].bbox[1]/InputFeatureSize.y, 0));
+   
                         if (Physics.Raycast(ray, out hit)){
+
                             Vector3 tempLocation = ray.origin + (ray.direction * hit.distance);
                             GameObject newObject = Instantiate(objectOutlineCube, tempLocation, Quaternion.identity);
-                            newObject.GetComponentInChildren<TextMeshPro>().SetText(result[0].label);
+                            newObject.transform.localScale = new Vector3(1*(result[0].bbox[2]/InputFeatureSize.x)*hit.distance, 1*(result[0].bbox[3]/InputFeatureSize.y)*hit.distance, .2F);
+                            newObject.GetComponentInChildren<TextMeshPro>().SetText("Object: " + result[0].label + " Confidence: " + Math.Round((decimal)result[0].prob, 2)*100 + "%");
+                            //newObject.transform.LookAt(cam.transform, newObject.transform.up);
                             Debug.Log("Created 3D Bounding Box at " + tempLocation);
-   
+                            newObject.GetComponent<BoundingBoxScript>().networkResultWithLocation = new NetworkResultWithLocation(result[0].label, result[0].bbox, result[0].prob, newObject);
+                            //resultWithLocation.Add(new NetworkResultWithLocation(result[0].label, result[0].bbox, result[0].prob, newObject);
                             }
 
                   }
@@ -183,6 +193,10 @@ public class NetworkBehaviour : MonoBehaviour
             {
                     GameObject.Find("OutputWindow").GetComponent<TextMeshPro>().SetText("Nothing Detected in Current Frame");
             }
+
+            Destroy(cameraGameObject);
+            //});
+
         }
 #endif
     }
@@ -197,11 +211,11 @@ public class NetworkBehaviour : MonoBehaviour
             result = await _networkModel.EvaluateVideoFrameAsync(videoFrame);
 
             // Update the UI with prediction
-            UnityEngine.WSA.Application.InvokeOnAppThread(() =>
-            {
+            //UnityEngine.WSA.Application.InvokeOnAppThread(() =>
+            //{
 
 
-            }, false);
+            //}, false);
         }
         catch (Exception ex)
         {

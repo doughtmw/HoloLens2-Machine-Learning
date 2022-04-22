@@ -69,7 +69,9 @@ public class NetworkBehaviour : MonoBehaviour
         cam = Camera.main;
         cameraHeight = Camera.main.orthographicSize * 2.0f;
         cameraWidth = cameraHeight * Camera.main.aspect;
-
+        cameraGameObject = new GameObject();
+        newCamera = cameraGameObject.AddComponent<Camera>();
+        newCamera.enabled = false;
         try
         {
             // Create a new instance of the network model class
@@ -98,7 +100,7 @@ public class NetworkBehaviour : MonoBehaviour
 
             }
 
-
+        //https://github.com/petergu684/HoloLens2-ResearchMode-Unity
         researchMode = new HL2ResearchMode();
 
         // Depth sensor should be initialized in only one mode
@@ -148,11 +150,9 @@ public class NetworkBehaviour : MonoBehaviour
                 {
                     using (var videoFrame = _mediaCaptureUtility.GetLatestFrame())
                     {
+                        //take "snapshot" of current camera position and rotation, so if user moves while model is working on detection, the resulting location wont be skewed
                         currentPosition = cam.transform.position;
                         currentRotation = cam.transform.rotation;
-                        cameraGameObject = new GameObject();
-                        newCamera = cameraGameObject.AddComponent<Camera>();
-                        newCamera.enabled = false;
                         newCamera.transform.position = currentPosition;
                         newCamera.transform.rotation = currentRotation;
                         await EvaluateFrame(videoFrame);
@@ -173,19 +173,25 @@ public class NetworkBehaviour : MonoBehaviour
                         Debug.Log("BBox x coord is: " + result[0].bbox[0] + " and BBox y coord is :" + result[0].bbox[1] + " and the width is: " + result[0].bbox[2] +
                         " and the height is: " + result[0].bbox[3]);
 
+                        //This thing here needs to be looked at, specifically the y values, input to ViewportPointToRay is a value, 0 to 1, that represents the area of the respective axis.
+                        //Something is wrong with the way the y axis is caluculated when object is low on the frame
                         Ray ray = newCamera.ViewportPointToRay(new Vector3(result[0].bbox[0]/InputFeatureSize.x, result[0].bbox[1]/InputFeatureSize.y, 0));
-   
-                        if (Physics.Raycast(ray, out hit)){
 
-                            Vector3 tempLocation = ray.origin + (ray.direction * hit.distance);
-                            GameObject newObject = Instantiate(objectOutlineCube, tempLocation, Quaternion.identity);
-                            newObject.transform.localScale = new Vector3(1*(result[0].bbox[2]/InputFeatureSize.x)*hit.distance, 1*(result[0].bbox[3]/InputFeatureSize.y)*hit.distance, .2F);
-                            newObject.GetComponentInChildren<TextMeshPro>().SetText("Object: " + result[0].label + " Confidence: " + Math.Round((decimal)result[0].prob, 2)*100 + "%");
-                            //newObject.transform.LookAt(cam.transform, newObject.transform.up);
-                            Debug.Log("Created 3D Bounding Box at " + tempLocation);
-                            newObject.GetComponent<BoundingBoxScript>().networkResultWithLocation = new NetworkResultWithLocation(result[0].label, result[0].bbox, result[0].prob, newObject);
-                            //resultWithLocation.Add(new NetworkResultWithLocation(result[0].label, result[0].bbox, result[0].prob, newObject);
-                            }
+                    //We use a ray from the viewport at the direction of the detection in 2D space to determine depth.  The first thing the ray hits, the intended object, 
+                    //becomes the 3D coordinate of the object
+
+                    if (Physics.Raycast(ray, out hit))
+                    {
+
+                        Vector3 tempLocation = ray.origin + (ray.direction * hit.distance);
+                        GameObject newObject = Instantiate(objectOutlineCube, tempLocation, Quaternion.identity);
+                        newObject.transform.localScale = new Vector3(1 * (result[0].bbox[2] / InputFeatureSize.x) * hit.distance, 1 * (result[0].bbox[3] / InputFeatureSize.y) * hit.distance, .2F);
+                        newObject.GetComponentInChildren<TextMeshPro>().SetText("Object: " + result[0].label + " Confidence: " + Math.Round((decimal)result[0].prob, 2) * 100 + "%");
+                        //newObject.transform.LookAt(cam.transform, newObject.transform.up);
+                        Debug.Log("Created 3D Bounding Box at " + tempLocation);
+                        newObject.GetComponent<BoundingBoxScript>().networkResultWithLocation = new NetworkResultWithLocation(result[0].label, result[0].bbox, result[0].prob, newObject);
+                        resultWithLocation.Add(new NetworkResultWithLocation(result[0].label, result[0].bbox, result[0].prob, newObject));
+                    }
 
                   }
             }
@@ -193,8 +199,13 @@ public class NetworkBehaviour : MonoBehaviour
             {
                     GameObject.Find("OutputWindow").GetComponent<TextMeshPro>().SetText("Nothing Detected in Current Frame");
             }
-
-            Destroy(cameraGameObject);
+        //Housekeeping to remove any list entry whose GameObject was deleted during a collision
+            foreach(NetworkResultWithLocation result in resultWithLocation){
+                if(result.gameObject == null){
+                    resultWithLocation.Remove(result);  
+                }
+            }
+            //Destroy(cameraGameObject);
             //});
 
         }

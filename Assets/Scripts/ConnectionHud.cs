@@ -22,6 +22,8 @@ public class ConnectionHud : MonoBehaviour
     public GameObject startHostButton;
     public GameObject serverPrefab;
     public GameObject clientPrefab;
+    public GameObject buttonParent;
+    public GameObject objectDetection;
 
     void Start()
     {
@@ -37,13 +39,21 @@ public class ConnectionHud : MonoBehaviour
     public void serverButtonPressed()
     {
             var serverInstance = Instantiate(serverPrefab);
+            buttonParent.SetActive(false);
+            objectDetection.SetActive(true);
+
     }
 
 
     public void clientButtonPressed()
     {
         var clientInstance = Instantiate(clientPrefab);
+        buttonParent.SetActive(false);
+        //while(clientInstance.GetComponent<SocketClient>().currentState != 2)
+       // {
 
+       // }
+       // objectDetection.SetActive(true);
     }
 
 

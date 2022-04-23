@@ -16,6 +16,7 @@ using System.Threading;
 using Microsoft.MixedReality.OpenXR.ARFoundation;
 using Microsoft.MixedReality.OpenXR;
 using System.Threading.Tasks;
+using System.Runtime.Serialization.Formatters.Binary;
 
 #if !UNITY_EDITOR
 using Windows.Networking;
@@ -36,17 +37,24 @@ using System.Net.Sockets;
 
 
 [RequireComponent(typeof(ARAnchorManager))]
-[RequireComponent(typeof(ARAnchor))]
+
 public class SocketServer : MonoBehaviour
 {
-    public String _input = "Waiting";
+    private enum SystemStates
+    {
+        Initializing,
+        CreatingAnchor,
+        TransferingAnchor,
+        AnchorTransfered
+    }
+    public int currentState;
     TrackableId myTrackableId;
     XRAnchorTransferBatch myAnchorTransferBatch = new XRAnchorTransferBatch();
-    bool localAnchorAdded = false;
-    bool localBatchReady = false;
-    bool localAnchorStreamCreated = false;
+    bool clientConnected = false;
+    bool anchorFresh = false;
+    int counter = 0;
 
-    MemoryStream memoryStream;
+    
     
 
 #if !UNITY_EDITOR
@@ -65,10 +73,10 @@ public class SocketServer : MonoBehaviour
     async void Start()
     {
 
-
+        currentState = (int)SystemStates.Initializing;
 
 #if !UNITY_EDITOR
-        
+
         port = "15463";
         listener.ConnectionReceived += Listener_ConnectionReceived;
         listener.Control.KeepAlive = false;
@@ -77,7 +85,7 @@ public class SocketServer : MonoBehaviour
 #else
 
 #endif
-        int success = await tryAddLocalAnchor();
+
 
     }
 
@@ -102,52 +110,8 @@ public class SocketServer : MonoBehaviour
 
     private async void Listener_ConnectionReceived(StreamSocketListener sender, StreamSocketListenerConnectionReceivedEventArgs args)
     {
-        try
-        {
-            clientSocket = args.Socket;
-            //None of the Debug Messages here will show on the main thread.
-            if (localAnchorStreamCreated)
-            {
-                long streamLength = memoryStream.Length;
-                int bytesSent = 0;
-                int bufferSize = 8192;
-                byte[] dataBuffer = new byte[bufferSize];
-                byte[] byteAnchorStreamTemp = memoryStream.ToArray();
-                int clientAnchorReceived = 0;
-
-                //memoryStream.Close();
-                byte[] lengthBytes = BitConverter.GetBytes(byteAnchorStreamTemp.Length);
-
-                using (Stream dataWriter = clientSocket.OutputStream.AsStreamForWrite())
-                {
-                    using (Stream dataReader = clientSocket.InputStream.AsStreamForRead())
-                    {
-
-                        await Task.WhenAll(dataWriter.WriteAsync(lengthBytes, 0, lengthBytes.Length), dataWriter.FlushAsync());
-
-                        await Task.WhenAll(dataWriter.WriteAsync(byteAnchorStreamTemp, 0, byteAnchorStreamTemp.Length), dataWriter.FlushAsync());
-
-                    }
-                }
-                localBatchReady = true;
-            }
-            else
-            {
-                Debug.Log("Connection Received, but no anchor batch ready to send");
-                //clientSocket.WriteAsync(-1);
-            }
-        }
-        catch (Exception e)
-        {
-            throw;
-        }
-        finally
-        {
-            Debug.Log("Anchor sent to client");
-            //Client Stream will hang unless socket connection is closed.  Wait given milliseconds for the client buffer to be read into it's memory
-            await Task.Delay(5000);
-            clientSocket.Dispose();
-        }
+        clientSocket = args.Socket;
+        clientConnected = true;
     }
 
 #else
@@ -155,16 +119,31 @@ public class SocketServer : MonoBehaviour
 #endif
 
 
-    void Update()
+    async void Update()
     {
+        MemoryStream memoryStream = new MemoryStream();
 #if !UNITY_EDITOR
+        counter += 1;
 
-
-        if (localBatchReady)
+        if (counter >= 60 && clientConnected)
         {
-            Debug.Log("Client Connected! - Exporting Host Anchor");
-            //Debug.Log("The size of the written stream is: " + memoryStream.Length);
-            localBatchReady = false;
+            counter = 0;
+            if(currentState != 1)
+            {
+                memoryStream = await tryAddLocalAnchor();
+                while (memoryStream == null)
+                {
+                    memoryStream = await tryAddLocalAnchor();
+                }
+                anchorFresh = true;
+            }
+
+            if(currentState != 2 && anchorFresh)
+            {
+                await trysendAnchor(memoryStream);
+            }
+
+            memoryStream.Close();
         }
 
 
@@ -197,49 +176,87 @@ public class SocketServer : MonoBehaviour
         StopExchange();
     }
 
-    async Task<int> tryAddLocalAnchor()
+#if !UNITY_EDITOR
+    async Task<MemoryStream> tryAddLocalAnchor()
     {
-
-        Debug.Log("Creating Export Anchor Batch in Socket Stream");
-
-        while (memoryStream == null)
+        MemoryStream memoryStream;
+        //Debug.Log("Creating Export Anchor Batch in Socket Stream");
+        try
         {
+            if(myAnchorTransferBatch.AnchorNames.Count > 1)
+            {
+                myAnchorTransferBatch.RemoveAnchor("ParentAnchor");
+            }
             myTrackableId = GameObject.Find("AnchorParent").GetComponent<ARAnchor>().trackableId;
             myAnchorTransferBatch.AddAnchor(myTrackableId, "ParentAnchor");
-            memoryStream = (MemoryStream) await XRAnchorTransferBatch.ExportAsync(myAnchorTransferBatch);  
+            memoryStream = (MemoryStream)await XRAnchorTransferBatch.ExportAsync(myAnchorTransferBatch);
+
+
+            return memoryStream;
         }
-        if (memoryStream != null)
+        catch(Exception e)
         {
-            Debug.Log("Anchor written to disk of size: " + memoryStream.Length + " bytes");
-            localAnchorStreamCreated = true;
-            Debug.Log("Anchor Copied To Local Stream");
-
+            return null;
         }
 
-        return 1;
 
     }
 
-    XRAnchorSubsystem CreateXRSubsystem()
+
+    async Task<bool> trysendAnchor(MemoryStream memoryStream)
     {
-        // Get all available plane subsystems
-        var descriptors = new List<XRAnchorSubsystemDescriptor>();
-        SubsystemManager.GetSubsystemDescriptors(descriptors);
-
-        // Find one that supports boundary vertices
-        foreach (var descriptor in descriptors)
+        currentState = (int)SystemStates.TransferingAnchor;
+        try
         {
-            if (descriptor.supportsTrackableAttachments)
-            {
-                //Debug.Log("We got here!");
-                // Create this plane subsystem
-                return descriptor.Create();
-            }
+
+            //None of the Debug Messages here will show on the main thread.
+            //if (localAnchorStreamCreated)
+            //{
+                long streamLength = memoryStream.Length;
+                int bytesSent = 0;
+                int bufferSize = 8192;
+                byte[] dataBuffer = new byte[bufferSize];
+                byte[] byteAnchorStreamTemp = memoryStream.ToArray();
+                int clientAnchorReceived = 0;
+
+                //memoryStream.Close();
+                byte[] lengthBytes = BitConverter.GetBytes(byteAnchorStreamTemp.Length);
+
+                using (Stream dataWriter = clientSocket.OutputStream.AsStreamForWrite())
+                {
+                    using (Stream dataReader = clientSocket.InputStream.AsStreamForRead())
+                    {
+
+                        await Task.WhenAll(dataWriter.WriteAsync(lengthBytes, 0, lengthBytes.Length), dataWriter.FlushAsync());
+
+                        await Task.WhenAll(dataWriter.WriteAsync(byteAnchorStreamTemp, 0, byteAnchorStreamTemp.Length), dataWriter.FlushAsync());
+
+                    }
+                }
+            return true;
+                //localBatchReady = true;
+           // }
+            //else
+           // {
+               // Debug.Log("Connection Received, but no anchor batch ready to send");
+                //clientSocket.WriteAsync(-1);
+            //}
+        }
+        catch (Exception e)
+        {
+            return false;
+            throw;
+        }
+        finally
+        {
+            Debug.Log("Anchor sent to client");
+            //Client Stream will hang unless socket connection is closed.  Wait given milliseconds for the client buffer to be read into it's memory
+            //await Task.Delay(5000);
+            currentState = (int)SystemStates.AnchorTransfered;
+            //clientSocket.Dispose();
         }
 
-
-        return null;
     }
-
+#endif
 
 }

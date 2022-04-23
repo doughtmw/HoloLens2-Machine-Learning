@@ -14,6 +14,7 @@ using System.Text;
 using System.Threading;
 using Microsoft.MixedReality.OpenXR.ARFoundation;
 using System.Threading.Tasks;
+using System.Runtime.Serialization.Formatters.Binary;
 
 #if !UNITY_EDITOR
 using Windows.Networking;
@@ -26,14 +27,21 @@ using System.Net.Sockets;
 #endif
 
 [RequireComponent(typeof(ARAnchorManager))]
-[RequireComponent(typeof(ARAnchor))]
+
 //Able to act as a reciever 
 public class SocketClient : MonoBehaviour
 {
-    public String _input = "Waiting";
-    String message;
+
+    private enum SystemStates
+    {
+        Initializing,
+        TransferingAnchor,
+        AnchorTransfered
+    }
+    public int currentState;
     XRAnchorTransferBatch myAnchorTransferBatch = new XRAnchorTransferBatch();
     bool anchorReceived = false;
+    bool connectedToServer = false;
     MemoryStream tempStream = new MemoryStream();
 
 #if !UNITY_EDITOR
@@ -74,6 +82,7 @@ public class SocketClient : MonoBehaviour
 #if !UNITY_EDITOR
     private async void Client_Start()
     {
+        currentState = (int)SystemStates.Initializing;
         Debug.Log("Client Started");
 
         try
@@ -93,11 +102,7 @@ public class SocketClient : MonoBehaviour
             }
         }
 
-        if (_Connected)
-        {
-            Debug.Log("Connected to Server");
-            attemptReceiveSpatialAnchor();
-        }
+
 
 
     }
@@ -114,9 +119,8 @@ public class SocketClient : MonoBehaviour
         int counter = 0;
         int streamLength;
         MemoryStream tempMemStream;
+        currentState = (int)SystemStates.TransferingAnchor;
 
-        if (_Connected && !anchorReceived)
-        {
             try
             {
                 using (Stream dataWriter = socket.OutputStream.AsStreamForWrite())
@@ -126,10 +130,10 @@ public class SocketClient : MonoBehaviour
                     
 
                         await dataReader.ReadAsync(lengthBuffer, 0, lengthBuffer.Length);
-                    streamLength = BitConverter.ToInt32(lengthBuffer, 0);
-                    byte[] myReadBuffer = new byte[bufferSize];
-                    byte[] tempByteArray = new byte[streamLength];
-                    Debug.Log("Attempting to read anchor of size: " + streamLength + " bytes");
+                        streamLength = BitConverter.ToInt32(lengthBuffer, 0);
+                        byte[] myReadBuffer = new byte[bufferSize];
+                        byte[] tempByteArray = new byte[streamLength];
+                        Debug.Log("Attempting to read anchor of size: " + streamLength + " bytes");
                         // Incoming message may be larger than the buffer size.
                         do{
                             
@@ -165,6 +169,7 @@ public class SocketClient : MonoBehaviour
                     if(myAnchorTransferBatch != null)
                     {
                         Debug.Log("Host Anchor Imported to Local System");
+                        currentState = (int)SystemStates.AnchorTransfered;
                     }
                     
                 }
@@ -181,13 +186,7 @@ public class SocketClient : MonoBehaviour
             {
                 
             }
-        }
            
-        else
-        {
-            Debug.Log("No Server Connection Yet");
-        }
-
 
     }
 
@@ -274,13 +273,20 @@ public class SocketClient : MonoBehaviour
     void Update()
     {
 #if !UNITY_EDITOR
-        if (anchorReceived)
+        if (_Connected && currentState != 1)
         {
             try
             {
-                Debug.Log("Received Anchor named:" + myAnchorTransferBatch.AnchorNames[0]);
+                if (myAnchorTransferBatch.AnchorNames.Count > 1)
+                {
+                    myAnchorTransferBatch.RemoveAnchor("ParentAnchor");
+                }
                 anchorReceived = false;
+                Debug.Log("Connected to Server");
+                attemptReceiveSpatialAnchor();
 
+                Debug.Log("Have Anchors: " + myAnchorTransferBatch.AnchorNames.Count);
+                //Debug.Log("Received Anchor named:" + myAnchorTransferBatch.AnchorNames[0]);
             }
             catch (Exception exception)
             {

@@ -147,7 +147,7 @@ public class NetworkBehaviour : MonoBehaviour
             #endif
         }
     }
-#endregion
+    #endregion
 
 #if ENABLE_WINMD_SUPPORT
     private async Task EvaluateFrame(Windows.Media.VideoFrame videoFrame)
@@ -197,21 +197,27 @@ public class NetworkBehaviour : MonoBehaviour
 
             if (result.Count != 0)
             {
+                Debug.Log("***********************************************************************");
                 Debug.Log("BBox x coord is: " + result[0].bbox[0] + " and BBox y coord is :" + result[0].bbox[1] + " and the width is: " + result[0].bbox[2] +
                  " and the height is: " + result[0].bbox[3]);
-
+                Debug.Log("***********************************************************************");
                 //This thing here needs to be looked at, specifically the y values, input to ViewportPointToRay is a value, 0 to 1, that represents the area of the respective axis.
                 //Something is wrong with the way the y axis is caluculated when object is low on the frame
-
+                Debug.Log("Ray calculating: " + result[0].bbox[0] + " / " + InputFeatureSize.x + ", " + result[0].bbox[1] + " / " + InputFeatureSize.y);
                 Ray ray = newCamera.ViewportPointToRay(new Vector3(result[0].bbox[0] / InputFeatureSize.x, result[0].bbox[1] / InputFeatureSize.y, 0));
-
+                Debug.Log("New Ray is of vector: " + new Vector3(result[0].bbox[0] / InputFeatureSize.x, result[0].bbox[1] / InputFeatureSize.y, 0));
+                Debug.Log("***********************************************************************");
+                //InputFeatureSize x and y are 416 and 416
                 //We use a ray from the viewport at the direction of the detection in 2D space to determine depth.  The first thing the ray hits, the intended object, 
                 //becomes the 3D coordinate of the object
 
                 if (Physics.Raycast(ray, out hit))
                 {
-
-                    Vector3 tempLocation = ray.origin + (ray.direction * hit.distance);
+                    Debug.Log("***********************************************************************");
+                    Debug.Log("RAY ORIGIN = " + ray.origin + " RAY HIT = " + hit.point);
+                    Debug.Log("***********************************************************************");
+                    Vector3 tempLocation = hit.point;
+                    //Vector3 tempLocation = ray.origin + (ray.direction * hit.distance);
                     GameObject newObject = Instantiate(objectOutlineCube, tempLocation, Quaternion.identity);
                     newObject.transform.localScale = new Vector3(1 * (result[0].bbox[2] / InputFeatureSize.x) * hit.distance, 1 * (result[0].bbox[3] / InputFeatureSize.y) * hit.distance, .2F);
                     newObject.GetComponentInChildren<TextMeshPro>().SetText("Object: " + result[0].label + " Confidence: " + Math.Round((decimal)result[0].prob, 2) * 100 + "%");

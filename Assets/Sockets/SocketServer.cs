@@ -208,10 +208,6 @@ public class SocketServer : MonoBehaviour
         currentState = (int)SystemStates.TransferingAnchor;
         try
         {
-
-            //None of the Debug Messages here will show on the main thread.
-            //if (localAnchorStreamCreated)
-            //{
                 long streamLength = memoryStream.Length;
                 int bytesSent = 0;
                 int bufferSize = 8192;
@@ -234,13 +230,7 @@ public class SocketServer : MonoBehaviour
                     }
                 }
             return true;
-                //localBatchReady = true;
-           // }
-            //else
-           // {
-               // Debug.Log("Connection Received, but no anchor batch ready to send");
-                //clientSocket.WriteAsync(-1);
-            //}
+    
         }
         catch (Exception e)
         {

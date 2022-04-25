@@ -184,10 +184,10 @@ public class SocketClient : MonoBehaviour
 
             finally
             {
-                
+            
             }
-           
 
+        tempMemStream.Close();
     }
 
 #else

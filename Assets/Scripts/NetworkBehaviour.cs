@@ -219,7 +219,7 @@ public class NetworkBehaviour : MonoBehaviour
                     Vector3 tempLocation = hit.point;
                     //Vector3 tempLocation = ray.origin + (ray.direction * hit.distance);
                     GameObject newObject = Instantiate(objectOutlineCube, tempLocation, Quaternion.identity);
-                    newObject.transform.localScale = new Vector3(1 * (result[0].bbox[2] / InputFeatureSize.x) * hit.distance, 1 * (result[0].bbox[3] / InputFeatureSize.y) * hit.distance, .2F);
+                    //newObject.transform.localScale = new Vector3(1 * (result[0].bbox[2] / InputFeatureSize.x) * hit.distance, 1 * (result[0].bbox[3] / InputFeatureSize.y) * hit.distance, .2F);
                     newObject.GetComponentInChildren<TextMeshPro>().SetText("Object: " + result[0].label + " Confidence: " + Math.Round((decimal)result[0].prob, 2) * 100 + "%");
                     //newObject.transform.LookAt(cam.transform, newObject.transform.up);
                     Debug.Log("Created 3D Bounding Box at " + tempLocation);

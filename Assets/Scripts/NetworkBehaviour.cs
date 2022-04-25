@@ -101,7 +101,9 @@ public class NetworkBehaviour : MonoBehaviour
 
             }
 
-        /*//https://github.com/petergu684/HoloLens2-ResearchMode-Unity
+        /*
+        //Disregard this code, uses Research Mode funcitonality that we currently dont need, might be needed later so I kept it commented
+        //https://github.com/petergu684/HoloLens2-ResearchMode-Unity
         researchMode = new HL2ResearchMode();
 
         // Depth sensor should be initialized in only one mode
@@ -219,12 +221,15 @@ public class NetworkBehaviour : MonoBehaviour
                     Vector3 tempLocation = hit.point;
                     //Vector3 tempLocation = ray.origin + (ray.direction * hit.distance);
                     GameObject newObject = Instantiate(objectOutlineCube, tempLocation, Quaternion.identity);
-                    //newObject.transform.localScale = new Vector3(1 * (result[0].bbox[2] / InputFeatureSize.x) * hit.distance, 1 * (result[0].bbox[3] / InputFeatureSize.y) * hit.distance, .2F);
+                    newObject.transform.localScale = new Vector3(1 * (result[0].bbox[2] / InputFeatureSize.x) * hit.distance, 1 * (result[0].bbox[3] / InputFeatureSize.y) * hit.distance, .2F);
+                    //Update label with detection data
                     newObject.GetComponentInChildren<TextMeshPro>().SetText("Object: " + result[0].label + " Confidence: " + Math.Round((decimal)result[0].prob, 2) * 100 + "%");
-                    //newObject.transform.LookAt(cam.transform, newObject.transform.up);
                     Debug.Log("Created 3D Bounding Box at " + tempLocation);
+                    //add the NetworkResultWithLocation object to the GameObject bbox, for use in comparing them during collision
                     newObject.GetComponent<BoundingBoxScript>().networkResultWithLocation = new NetworkResultWithLocation(result[0].label, result[0].bbox, result[0].prob, newObject);
+                    //set the new bbox's parent to the anchor manager GameObject
                     newObject.transform.parent = anchorParent.transform;
+                    //add the new NetworkResultWithLocation object to the running list
                     resultWithLocation.Add(new NetworkResultWithLocation(result[0].label, result[0].bbox, result[0].prob, newObject));
                 }
             }

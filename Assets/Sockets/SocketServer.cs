@@ -54,9 +54,6 @@ public class SocketServer : MonoBehaviour
     bool anchorFresh = false;
     int counter = 0;
 
-    
-    
-
 #if !UNITY_EDITOR
     StreamSocketListener listener = new StreamSocketListener();
     String port;
@@ -86,9 +83,7 @@ public class SocketServer : MonoBehaviour
 
 #endif
 
-
     }
-
 
 #if !UNITY_EDITOR
         private async Task<bool> Listener_Start()
@@ -164,7 +159,6 @@ public class SocketServer : MonoBehaviour
 
         listener.Dispose();
 
-
             listener = null;
 
 #endif
@@ -191,7 +185,6 @@ public class SocketServer : MonoBehaviour
             myAnchorTransferBatch.AddAnchor(myTrackableId, "ParentAnchor");
             memoryStream = (MemoryStream)await XRAnchorTransferBatch.ExportAsync(myAnchorTransferBatch);
 
-
             return memoryStream;
         }
         catch(Exception e)
@@ -199,9 +192,7 @@ public class SocketServer : MonoBehaviour
             return null;
         }
 
-
     }
-
 
     async Task<bool> trysendAnchor(MemoryStream memoryStream)
     {

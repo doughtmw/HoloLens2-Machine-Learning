@@ -102,9 +102,6 @@ public class SocketClient : MonoBehaviour
             }
         }
 
-
-
-
     }
 
     private async void attemptReceiveSpatialAnchor()
@@ -128,7 +125,6 @@ public class SocketClient : MonoBehaviour
                     using (Stream dataReader = socket.InputStream.AsStreamForRead())
                     {
                     
-
                         await dataReader.ReadAsync(lengthBuffer, 0, lengthBuffer.Length);
                         streamLength = BitConverter.ToInt32(lengthBuffer, 0);
                         byte[] myReadBuffer = new byte[bufferSize];

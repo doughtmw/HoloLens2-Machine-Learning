@@ -43,7 +43,7 @@ public class BoundingBoxScript : MonoBehaviour
         targetRotation.z=0;
         //Setting Rotation along x axis to zero
         targetRotation.x=0;
-        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+        textComponent.transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
 
     }
 }

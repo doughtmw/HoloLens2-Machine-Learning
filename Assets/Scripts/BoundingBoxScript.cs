@@ -37,15 +37,5 @@ public class BoundingBoxScript : MonoBehaviour
         rotation.z = 0;
         rotation.x = 0;
         textComponent.transform.rotation = rotation;
-
-        // Wilchek
-        //Rotate only the text box (the label of the bbox) to face the user
-        //Quaternion targetRotation = Quaternion.LookRotation(Camera.main.transform.position - textComponent.transform.position);
-        // Setting Rotation along z axis to zero
-        //targetRotation.z=0;
-        //Setting Rotation along x axis to zero
-        //targetRotation.x=0;
-        //textComponent.transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
-
     }
 }
